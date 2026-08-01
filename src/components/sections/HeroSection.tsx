@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import type { Profile, MediaItem } from '../../types/cms';
 import { MapPin, Mail, Phone, Download, ExternalLink, ArrowDown } from 'lucide-react';
+import { toMediaSrc } from '../../utils/mediaUrl';
 
 interface HeroSectionProps {
   profile: Profile;
@@ -10,7 +11,7 @@ interface HeroSectionProps {
 
 export const HeroSection: React.FC<HeroSectionProps> = ({ profile, mediaLibrary }) => {
   const avatarItem = mediaLibrary.find(m => m.id === profile.avatarMediaId);
-  const avatarSrc = avatarItem?.url || profile.avatarUrl || '/profile.jpg';
+  const avatarSrc = toMediaSrc(avatarItem?.url || profile.avatarUrl || '/profile.jpg');
 
   const container = {
     hidden: { opacity: 0 },

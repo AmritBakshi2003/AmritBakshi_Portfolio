@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Project, MediaItem } from '../../types/cms';
 import { ExternalLink, ChevronDown, ChevronUp, ArrowUpRight, Image as ImageIcon, FileText, Maximize2 } from 'lucide-react';
 import { MediaLightboxModal } from '../common/MediaLightboxModal';
+import { toMediaSrc } from '../../utils/mediaUrl';
 
 interface ProjectsSectionProps {
   projects: Project[];
@@ -100,7 +101,7 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects, medi
                           </div>
                         ) : (
                           <img 
-                            src={coverImage.url} 
+                            src={toMediaSrc(coverImage.url)} 
                             alt={coverImage.altText || project.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
                           />
@@ -224,7 +225,7 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects, medi
                                     </div>
                                   ) : (
                                     <img
-                                      src={item.url}
+                                      src={toMediaSrc(item.url)}
                                       alt={item.name}
                                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                                     />

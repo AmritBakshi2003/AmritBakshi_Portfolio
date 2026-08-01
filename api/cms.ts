@@ -1,10 +1,9 @@
-import { put, del, list } from '@vercel/blob';
+import { put, del, list, get } from '@vercel/blob';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const CMS_BLOB_FILENAME = 'cms-data.json';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Allow CORS for same-origin requests
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-admin-passcode');
@@ -17,7 +16,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     try {
       if (!token) {
-        return res.status(200).json({ connected: false, data: null, message: 'BLOB_READ_WRITE_TOKEN is not set.' });
+        return res.status(200).json({
+          connected: false,
+          data: null,
+          message: 'BLOB_READ_WRITE_TOKEN is not set.',
+        });
       }
 
       const { blobs } = await list({ prefix: CMS_BLOB_FILENAME, token });
@@ -25,17 +28,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ connected: true, data: null });
       }
 
-      // Get the most recent blob
-      const latest = blobs.sort((a, b) =>
-        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+      const latest = blobs.sort(
+        (a, b) =>
+          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
       )[0];
 
-      const response = await fetch(latest.url);
-      const data = await response.json();
+      // Private stores require get() — plain fetch() on the blob URL will fail.
+      const result = await get(latest.url, { access: 'private', token });
+      if (!result || result.statusCode !== 200 || !result.stream) {
+        return res.status(200).json({ connected: true, data: null });
+      }
+
+      const data = JSON.parse(await new Response(result.stream).text());
       return res.status(200).json({ connected: true, data });
     } catch (error) {
       console.error('[CMS API] GET error:', error);
-      return res.status(200).json({ connected: false, data: null, error: (error as Error).message });
+      return res
+        .status(200)
+        .json({ connected: false, data: null, error: (error as Error).message });
     }
   }
 
@@ -49,24 +59,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (!token) {
-      return res.status(500).json({ error: 'BLOB_READ_WRITE_TOKEN environment variable is missing on Vercel.' });
+      return res.status(500).json({
+        error: 'BLOB_READ_WRITE_TOKEN environment variable is missing on Vercel.',
+      });
     }
 
     try {
       const { data } = req.body;
       if (!data) return res.status(400).json({ error: 'No data provided' });
 
-      // Delete old CMS blobs to avoid accumulation
       const { blobs: existing } = await list({ prefix: CMS_BLOB_FILENAME, token });
       if (existing.length > 0) {
-        await Promise.all(existing.map(b => del(b.url, { token })));
+        await Promise.all(existing.map((b) => del(b.url, { token })));
       }
 
-      // Write new CMS JSON blob
       const blob = await put(CMS_BLOB_FILENAME, JSON.stringify(data), {
-        access: 'public',
+        access: 'private',
         contentType: 'application/json',
         addRandomSuffix: false,
+        allowOverwrite: true,
         token,
       });
 

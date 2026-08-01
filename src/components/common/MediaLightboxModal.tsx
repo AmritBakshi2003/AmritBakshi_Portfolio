@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { MediaItem } from '../../types/cms';
 import { X, ChevronLeft, ChevronRight, Download, FileText } from 'lucide-react';
+import { toMediaSrc } from '../../utils/mediaUrl';
 
 interface MediaLightboxModalProps {
   isOpen: boolean;
@@ -67,7 +68,7 @@ export const MediaLightboxModal: React.FC<MediaLightboxModalProps> = ({
 
         <div className="flex items-center gap-3">
           <a
-            href={currentItem.url}
+            href={toMediaSrc(currentItem.url)}
             target="_blank"
             rel="noopener noreferrer"
             download={currentItem.name}
@@ -110,7 +111,7 @@ export const MediaLightboxModal: React.FC<MediaLightboxModalProps> = ({
               <h4 className="text-lg font-semibold text-white mb-2">{currentItem.name}</h4>
               <p className="text-xs text-neutral-400 mb-6 font-mono">PDF Document Asset</p>
               <iframe
-                src={currentItem.url}
+                src={toMediaSrc(currentItem.url)}
                 className="w-full h-full rounded-xl border border-neutral-800 bg-white"
                 title={currentItem.name}
               />
@@ -118,7 +119,7 @@ export const MediaLightboxModal: React.FC<MediaLightboxModalProps> = ({
           ) : (
             <div className="relative max-w-full max-h-[75vh] flex flex-col items-center">
               <img
-                src={currentItem.url}
+                src={toMediaSrc(currentItem.url)}
                 alt={currentItem.altText || currentItem.name}
                 className="max-w-full max-h-[72vh] object-contain rounded-xl border border-neutral-800 shadow-2xl"
               />
@@ -164,7 +165,7 @@ export const MediaLightboxModal: React.FC<MediaLightboxModalProps> = ({
                   <FileText className="w-5 h-5" />
                 </div>
               ) : (
-                <img src={item.url} alt={item.name} className="w-full h-full object-cover" />
+                <img src={toMediaSrc(item.url)} alt={item.name} className="w-full h-full object-cover" />
               )}
             </button>
           ))}

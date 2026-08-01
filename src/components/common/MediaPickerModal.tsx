@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { MediaItem } from '../../types/cms';
 import { X, Upload, Check, FileText, Image as ImageIcon, Search } from 'lucide-react';
+import { toMediaSrc } from '../../utils/mediaUrl';
 
 interface MediaPickerModalProps {
   isOpen: boolean;
@@ -159,7 +160,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                     </div>
                   ) : (
                     <img 
-                      src={item.url} 
+                      src={toMediaSrc(item.url)} 
                       alt={item.altText || item.name}
                       className="w-full h-full object-cover"
                       onError={(e) => {

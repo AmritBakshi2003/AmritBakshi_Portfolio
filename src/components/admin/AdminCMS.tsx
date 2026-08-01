@@ -3,6 +3,7 @@ import type { PortfolioCMSData, Project, WorkExperience, Certification, Achievem
 import { TreeEditor } from './TreeEditor';
 import { MediaLibraryManager } from './MediaLibraryManager';
 import { MediaPickerModal } from '../common/MediaPickerModal';
+import { toMediaSrc } from '../../utils/mediaUrl';
 import { 
   Lock, 
   Unlock, 
@@ -729,7 +730,7 @@ export const AdminCMS: React.FC<AdminCMSProps> = ({
                               <span className="text-[8px] font-mono truncate max-w-[50px]">{item.name}</span>
                             </div>
                           ) : (
-                            <img src={item.url} alt={item.name} className="w-full h-full object-cover" />
+                            <img src={toMediaSrc(item.url)} alt={item.name} className="w-full h-full object-cover" />
                           )}
                           <button
                             onClick={() => {
@@ -991,7 +992,7 @@ export const AdminCMS: React.FC<AdminCMSProps> = ({
                                 <span className="text-[8px] font-mono truncate max-w-[50px]">{item.name}</span>
                               </div>
                             ) : (
-                              <img src={item.url} alt={item.name} className="w-full h-full object-cover" />
+                              <img src={toMediaSrc(item.url)} alt={item.name} className="w-full h-full object-cover" />
                             )}
                             <button
                               onClick={() => {

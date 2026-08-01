@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import type { MediaItem } from '../../types/cms';
+import { isBlobCloudUrl, toMediaSrc } from '../../utils/mediaUrl';
 import {
   Upload,
   Trash2,
@@ -62,15 +63,14 @@ async function uploadFileToCloud(file: File): Promise<string> {
 
   try {
     const blob = await upload(pathname, file, {
-      access: 'public',
+      access: 'private',
       handleUploadUrl: '/api/upload',
       contentType,
     });
     return blob.url;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    // On the deployed site, do not silently fall back to huge data-URLs —
-    // surface the real Blob error (pathname / access / content-type).
+    // On the deployed site, do not silently fall back to huge data-URLs.
     const isLocalDev =
       typeof window !== 'undefined' &&
       (window.location.hostname === 'localhost' ||
@@ -126,9 +126,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
       } catch (err) {
         console.error(`Failed to upload ${file.name}:`, err);
         const detail = err instanceof Error ? err.message : 'Unknown error';
-        alert(
-          `Failed to upload ${file.name}.\n\n${detail}\n\nIf this mentions access/private, recreate your Blob store as Public (portfolio media must be publicly readable).`,
-        );
+        alert(`Failed to upload ${file.name}.\n\n${detail}`);
       }
     }
 
@@ -149,7 +147,12 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
   };
 
   const handleCopyUrl = (url: string, id: string) => {
-    navigator.clipboard.writeText(url);
+    const playable = toMediaSrc(url);
+    const absolute =
+      playable.startsWith('/') && typeof window !== 'undefined'
+        ? `${window.location.origin}${playable}`
+        : playable;
+    navigator.clipboard.writeText(absolute);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
@@ -161,9 +164,6 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
     }
     return true;
   });
-
-  const isCloudUrl = (url: string) =>
-    url.startsWith('https://') && !url.startsWith('data:');
 
   return (
     <div className="cyber-card p-6 rounded-2xl space-y-6">
@@ -269,7 +269,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
                   </div>
                 ) : (
                   <img
-                    src={item.url}
+                    src={toMediaSrc(item.url)}
                     alt={item.altText || item.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     onError={(e) => {
@@ -279,7 +279,7 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
                   />
                 )}
                 {/* Cloud badge */}
-                {isCloudUrl(item.url) && (
+                {isBlobCloudUrl(item.url) && (
                   <span className="absolute top-1.5 right-1.5 bg-emerald-950/90 border border-emerald-500/40 text-emerald-300 text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-0.5">
                     <Cloud className="w-2.5 h-2.5" /> Cloud
                   </span>

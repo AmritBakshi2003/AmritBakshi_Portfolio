@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import type { Certification, MediaItem } from '../../types/cms';
 import { ShieldCheck, ExternalLink, FileText, Maximize2 } from 'lucide-react';
 import { MediaLightboxModal } from '../common/MediaLightboxModal';
+import { toMediaSrc } from '../../utils/mediaUrl';
 
 interface CertificationsSectionProps {
   certifications: Certification[];
@@ -91,7 +92,7 @@ export const CertificationsSection: React.FC<CertificationsSectionProps> = ({ ce
                       </div>
                     ) : (
                       <img
-                        src={coverItem.url}
+                        src={toMediaSrc(coverItem.url)}
                         alt={coverItem.altText || cert.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
