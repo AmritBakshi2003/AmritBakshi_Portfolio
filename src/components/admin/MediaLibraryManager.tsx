@@ -18,17 +18,69 @@ interface MediaLibraryManagerProps {
   onUpdateMediaLibrary: (updatedMedia: MediaItem[]) => void;
 }
 
-/** Try to upload to Vercel Blob. Falls back to local base64 DataURL in dev. */
+const MIME_TO_EXT: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/svg+xml': 'svg',
+  'application/pdf': 'pdf',
+};
+
+/** Build a Blob-safe pathname (no spaces/special chars; always has an extension). */
+function buildBlobPathname(file: File): string {
+  const rawExt = file.name.includes('.')
+    ? file.name.split('.').pop()?.toLowerCase() ?? ''
+    : '';
+  const ext =
+    (rawExt && /^[a-z0-9]{1,8}$/.test(rawExt) ? rawExt : null) ||
+    MIME_TO_EXT[file.type] ||
+    'bin';
+
+  const base =
+    file.name
+      .replace(/\.[^.]+$/, '')
+      .replace(/[^a-zA-Z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || 'upload';
+
+  return `media/${Date.now()}-${base}.${ext}`;
+}
+
+function resolveContentType(file: File, pathname: string): string {
+  if (file.type && file.type !== 'application/octet-stream') return file.type;
+  const ext = pathname.split('.').pop()?.toLowerCase();
+  const match = Object.entries(MIME_TO_EXT).find(([, e]) => e === ext);
+  return match?.[0] || 'application/octet-stream';
+}
+
+/** Upload to Vercel Blob. Falls back to local base64 DataURL only in local Vite dev. */
 async function uploadFileToCloud(file: File): Promise<string> {
+  const pathname = buildBlobPathname(file);
+  const contentType = resolveContentType(file, pathname);
+
   try {
-    const blob = await upload(file.name, file, {
+    const blob = await upload(pathname, file, {
       access: 'public',
       handleUploadUrl: '/api/upload',
+      contentType,
     });
     return blob.url;
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    // On the deployed site, do not silently fall back to huge data-URLs —
+    // surface the real Blob error (pathname / access / content-type).
+    const isLocalDev =
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1');
+
+    if (!isLocalDev) {
+      throw new Error(message || 'Vercel Blob upload failed');
+    }
+
     console.warn('[Media] Vercel Blob unavailable, falling back to local DataURL:', err);
-    // Fallback: read as base64 DataURL (works in local dev / if Blob not configured)
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => resolve(e.target?.result as string);
@@ -73,7 +125,10 @@ export const MediaLibraryManager: React.FC<MediaLibraryManagerProps> = ({
         });
       } catch (err) {
         console.error(`Failed to upload ${file.name}:`, err);
-        alert(`Failed to upload ${file.name}. Please try again.`);
+        const detail = err instanceof Error ? err.message : 'Unknown error';
+        alert(
+          `Failed to upload ${file.name}.\n\n${detail}\n\nIf this mentions access/private, recreate your Blob store as Public (portfolio media must be publicly readable).`,
+        );
       }
     }
 

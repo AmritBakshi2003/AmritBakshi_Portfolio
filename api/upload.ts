@@ -10,38 +10,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
 
   if (!token) {
-    return res.status(500).json({ error: 'BLOB_READ_WRITE_TOKEN environment variable is missing on Vercel.' });
+    return res.status(500).json({
+      error: 'BLOB_READ_WRITE_TOKEN environment variable is missing on Vercel.',
+    });
   }
 
   try {
-    const host = req.headers.host || 'localhost';
-    const protocol = host.includes('localhost') ? 'http' : 'https';
-    const webRequest = new Request(`${protocol}://${host}/api/upload`, {
-      method: 'POST',
-      headers: req.headers as unknown as HeadersInit,
-    });
-
+    // Pass the Node request directly — handleUpload accepts IncomingMessage.
+    // Avoid re-wrapping headers in a Fetch Request (can break callback URL inference).
     const jsonResponse = await handleUpload({
       body,
-      request: webRequest,
+      request: req,
       token,
-      onBeforeGenerateToken: async () => {
-        return {
-          allowedContentTypes: [
-            'image/jpeg',
-            'image/jpg',
-            'image/png',
-            'image/gif',
-            'image/webp',
-            'image/svg+xml',
-            'application/pdf',
-          ],
-          maximumSizeInBytes: 25 * 1024 * 1024, // 25 MB
-        };
-      },
-      onUploadCompleted: async ({ blob }) => {
-        console.log('[Vercel Blob] Upload completed:', blob.url);
-      },
+      onBeforeGenerateToken: async () => ({
+        allowedContentTypes: [
+          'image/jpeg',
+          'image/jpg',
+          'image/png',
+          'image/gif',
+          'image/webp',
+          'image/svg+xml',
+          'image/*',
+          'application/pdf',
+        ],
+        maximumSizeInBytes: 25 * 1024 * 1024, // 25 MB
+        addRandomSuffix: true,
+        allowOverwrite: false,
+      }),
     });
 
     return res.status(200).json(jsonResponse);
