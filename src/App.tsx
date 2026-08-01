@@ -63,15 +63,17 @@ function loadFromLocalStorage(): PortfolioCMSData {
 }
 
 // ── Fetch live CMS data from Vercel Blob via API ──
-async function fetchFromCloud(): Promise<PortfolioCMSData | null> {
+async function fetchFromCloud(): Promise<{ connected: boolean; data: PortfolioCMSData | null }> {
   try {
     const res = await fetch('/api/cms', { cache: 'no-store' });
-    if (!res.ok) return null;
-    const { data } = await res.json();
-    if (!data) return null;
-    return mergeWithDefaults(data as PortfolioCMSData);
+    if (!res.ok) return { connected: false, data: null };
+    const resJson = await res.json();
+    return {
+      connected: !!resJson.connected,
+      data: resJson.data ? mergeWithDefaults(resJson.data as PortfolioCMSData) : null,
+    };
   } catch {
-    return null; // API not available (local dev without Vercel env vars)
+    return { connected: false, data: null };
   }
 }
 
@@ -100,13 +102,15 @@ export function App() {
   // ── On mount: fetch cloud data and merge if newer ──
   useEffect(() => {
     setCloudSyncStatus('syncing');
-    fetchFromCloud().then(cloudData => {
-      if (cloudData) {
-        // Cloud data wins — it's the source of truth across all devices
-        setCmsData(cloudData);
+    fetchFromCloud().then(({ connected, data }) => {
+      if (data) {
+        setCmsData(data);
         try {
-          localStorage.setItem(CMS_STORAGE_KEY, JSON.stringify(cloudData));
+          localStorage.setItem(CMS_STORAGE_KEY, JSON.stringify(data));
         } catch (_) {}
+        setCloudSyncStatus('synced');
+      } else if (connected) {
+        // Blob store connected, but no save has been performed yet
         setCloudSyncStatus('synced');
       } else {
         setCloudSyncStatus('offline');

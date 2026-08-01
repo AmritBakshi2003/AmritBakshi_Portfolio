@@ -14,10 +14,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // ── GET: Load CMS data from Blob ──
   if (req.method === 'GET') {
     try {
+      // Check if BLOB_READ_WRITE_TOKEN is available
+      if (!process.env.BLOB_READ_WRITE_TOKEN) {
+        return res.status(200).json({ connected: false, data: null, message: 'BLOB_READ_WRITE_TOKEN environment variable is not set.' });
+      }
+
       const { blobs } = await list({ prefix: CMS_BLOB_FILENAME });
       if (blobs.length === 0) {
-        return res.status(200).json({ data: null });
+        return res.status(200).json({ connected: true, data: null });
       }
+
       // Get the most recent blob
       const latest = blobs.sort((a, b) =>
         new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
@@ -25,10 +31,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const response = await fetch(latest.url);
       const data = await response.json();
-      return res.status(200).json({ data });
+      return res.status(200).json({ connected: true, data });
     } catch (error) {
       console.error('[CMS API] GET error:', error);
-      return res.status(200).json({ data: null }); // Graceful fallback
+      return res.status(200).json({ connected: false, data: null, error: (error as Error).message });
     }
   }
 
@@ -47,7 +53,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Delete old CMS blobs to avoid accumulation
       const { blobs: existing } = await list({ prefix: CMS_BLOB_FILENAME });
-      await Promise.all(existing.map(b => del(b.url)));
+      if (existing.length > 0) {
+        await Promise.all(existing.map(b => del(b.url)));
+      }
 
       // Write new CMS JSON blob
       const blob = await put(CMS_BLOB_FILENAME, JSON.stringify(data), {
