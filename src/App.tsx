@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import type { PortfolioCMSData } from './types/cms';
 import { INITIAL_CMS_DATA } from './data/initialTreeData';
@@ -25,9 +25,9 @@ import { AdminCMS } from './components/admin/AdminCMS';
 
 const CMS_STORAGE_KEY = 'AMRIT_BAKSHI_CMS_DATA_V3';
 
-// Merge saved data with INITIAL to safely handle new fields added in updates
+// ── Merge saved data with INITIAL defaults (handles new fields added across updates) ──
 function mergeWithDefaults(saved: PortfolioCMSData): PortfolioCMSData {
-  const merged = {
+  const merged: PortfolioCMSData = {
     ...INITIAL_CMS_DATA,
     ...saved,
     profile: { ...INITIAL_CMS_DATA.profile, ...saved.profile },
@@ -37,53 +37,112 @@ function mergeWithDefaults(saved: PortfolioCMSData): PortfolioCMSData {
   if (!merged.profile.resumeUrl || merged.profile.resumeUrl === '#') {
     merged.profile.resumeUrl = '/Amrit_Bakshi_Resume.pdf';
   }
-  // Migrate education achievements text if saved from earlier
+  // Migrate older education coursework text
   if (merged.education) {
-    merged.education = merged.education.map(edu => {
-      if (edu.achievements) {
-        return {
-          ...edu,
-          achievements: edu.achievements.map(a =>
-            a === 'Active in data science and analytics coursework'
-              ? 'Active and interested in data analytics and science coursework'
-              : a
-          )
-        };
-      }
-      return edu;
-    });
+    merged.education = merged.education.map(edu => ({
+      ...edu,
+      achievements: edu.achievements?.map(a =>
+        a === 'Active in data science and analytics coursework'
+          ? 'Active and interested in data analytics and science coursework'
+          : a
+      ),
+    }));
   }
   return merged;
 }
 
-export function App() {
-  const [cmsData, setCmsData] = useState<PortfolioCMSData>(() => {
-    try {
-      const saved = localStorage.getItem(CMS_STORAGE_KEY);
-      if (saved) return mergeWithDefaults(JSON.parse(saved));
-    } catch (e) {
-      console.error('Failed loading saved CMS data:', e);
-    }
-    return INITIAL_CMS_DATA;
-  });
+// ── Load from localStorage (fast, synchronous, used as initial state) ──
+function loadFromLocalStorage(): PortfolioCMSData {
+  try {
+    const saved = localStorage.getItem(CMS_STORAGE_KEY);
+    if (saved) return mergeWithDefaults(JSON.parse(saved));
+  } catch (e) {
+    console.warn('[CMS] localStorage read failed:', e);
+  }
+  return INITIAL_CMS_DATA;
+}
 
-  const handleUpdateCMSData = (newData: PortfolioCMSData) => {
+// ── Fetch live CMS data from Vercel Blob via API ──
+async function fetchFromCloud(): Promise<PortfolioCMSData | null> {
+  try {
+    const res = await fetch('/api/cms', { cache: 'no-store' });
+    if (!res.ok) return null;
+    const { data } = await res.json();
+    if (!data) return null;
+    return mergeWithDefaults(data as PortfolioCMSData);
+  } catch {
+    return null; // API not available (local dev without Vercel env vars)
+  }
+}
+
+// ── Save CMS data to Vercel Blob via API ──
+async function saveToCloud(data: PortfolioCMSData, passcode: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/cms', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-passcode': passcode,
+      },
+      body: JSON.stringify({ data }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export function App() {
+  // ── Initialize from localStorage immediately (fast render) ──
+  const [cmsData, setCmsData] = useState<PortfolioCMSData>(loadFromLocalStorage);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'offline'>('idle');
+
+  // ── On mount: fetch cloud data and merge if newer ──
+  useEffect(() => {
+    setCloudSyncStatus('syncing');
+    fetchFromCloud().then(cloudData => {
+      if (cloudData) {
+        // Cloud data wins — it's the source of truth across all devices
+        setCmsData(cloudData);
+        try {
+          localStorage.setItem(CMS_STORAGE_KEY, JSON.stringify(cloudData));
+        } catch (_) {}
+        setCloudSyncStatus('synced');
+      } else {
+        setCloudSyncStatus('offline');
+      }
+    });
+  }, []);
+
+  const handleUpdateCMSData = useCallback(async (newData: PortfolioCMSData) => {
+    // 1. Update local state immediately
     setCmsData(newData);
+
+    // 2. Persist to localStorage as fast local cache
     try {
       localStorage.setItem(CMS_STORAGE_KEY, JSON.stringify(newData));
     } catch (e) {
-      console.error('Failed to persist CMS data:', e);
+      console.warn('[CMS] localStorage write failed:', e);
     }
-  };
 
-  const handleResetCMSData = () => {
+    // 3. Save to Vercel Blob cloud (so other browsers see it)
+    const passcode = newData.adminPasscode || 'admin123';
+    const saved = await saveToCloud(newData, passcode);
+    if (saved) {
+      setCloudSyncStatus('synced');
+    } else {
+      setCloudSyncStatus('offline');
+      console.warn('[CMS] Cloud save failed — data only in localStorage.');
+    }
+  }, []);
+
+  const handleResetCMSData = useCallback(async () => {
     setCmsData(INITIAL_CMS_DATA);
     try {
       localStorage.setItem(CMS_STORAGE_KEY, JSON.stringify(INITIAL_CMS_DATA));
-    } catch (e) {
-      console.error('Failed to reset CMS data:', e);
-    }
-  };
+    } catch (_) {}
+    await saveToCloud(INITIAL_CMS_DATA, INITIAL_CMS_DATA.adminPasscode);
+  }, []);
 
   const sv = cmsData.sectionVisibility;
 
@@ -178,11 +237,22 @@ export function App() {
           }
         />
 
-        {/* ─── SECRET: Admin CMS — unlinked from public site ─── */}
+        {/* ─── SECRET: Admin CMS ─── */}
         <Route
           path="/admin/*"
           element={
             <main className="min-h-screen bg-[#080b11]">
+              {/* Cloud sync status bar */}
+              {cloudSyncStatus === 'offline' && (
+                <div className="bg-amber-950/80 border-b border-amber-500/40 text-amber-300 text-xs font-mono text-center py-2 px-4">
+                  ⚠ Cloud sync unavailable — changes saved locally only. Set up Vercel Blob storage to enable cloud persistence.
+                </div>
+              )}
+              {cloudSyncStatus === 'synced' && (
+                <div className="bg-emerald-950/60 border-b border-emerald-500/30 text-emerald-400 text-xs font-mono text-center py-1.5 px-4">
+                  ✓ Connected to Vercel Blob — all changes sync across devices
+                </div>
+              )}
               <AdminCMS
                 data={cmsData}
                 onUpdateData={handleUpdateCMSData}
