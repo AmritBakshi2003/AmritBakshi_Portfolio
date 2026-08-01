@@ -17,6 +17,9 @@ import { EducationSection }     from './components/sections/EducationSection';
 import { AchievementsSection }  from './components/sections/AchievementsSection';
 import { ContactSection }       from './components/sections/ContactSection';
 
+// SEO
+import { SEOHead } from './components/common/SEOHead';
+
 // Admin (unchanged)
 import { AdminCMS } from './components/admin/AdminCMS';
 
@@ -93,6 +96,15 @@ export function App() {
           path="*"
           element={
             <>
+              <SEOHead
+                name={cmsData.profile.name}
+                title={cmsData.profile.title}
+                tagline={cmsData.profile.tagline}
+                email={cmsData.profile.email}
+                location={cmsData.profile.location}
+                github={cmsData.profile.github}
+                linkedin={cmsData.profile.linkedin}
+              />
               <SiteNav
                 name={cmsData.profile.name}
                 sectionVisibility={sv}

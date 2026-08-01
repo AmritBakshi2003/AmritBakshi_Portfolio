@@ -19,7 +19,22 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ profile, mediaLibrary 
   const item = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } };
 
   return (
-    <section id="hero" className="min-h-screen flex items-center pt-20 pb-16">
+    <section
+      id="hero"
+      className="min-h-screen flex items-center pt-20 pb-16"
+      itemScope
+      itemType="https://schema.org/Person"
+    >
+      {/* ATS & crawler readable hidden metadata */}
+      <meta itemProp="name" content={profile.name} />
+      <meta itemProp="jobTitle" content={profile.title} />
+      <meta itemProp="email" content={profile.email} />
+      <meta itemProp="telephone" content={profile.phone} />
+      <meta itemProp="url" content={typeof window !== 'undefined' ? window.location.origin : ''} />
+      <meta itemProp="image" content="/profile.jpg" />
+      <link itemProp="sameAs" href={profile.github || ''} />
+      <link itemProp="sameAs" href={profile.linkedin || ''} />
+
       <div className="max-w-5xl mx-auto px-6 w-full">
         <motion.div
           variants={container}

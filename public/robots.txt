@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+# Block admin route from search engine indexing
+Disallow: /admin
+
+Sitemap: https://amritbakshi.vercel.app/sitemap.xml

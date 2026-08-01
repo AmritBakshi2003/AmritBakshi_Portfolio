@@ -8,7 +8,20 @@ interface SkillsSectionProps {
   projects: Project[];
 }
 
+/** Recursively collect all skill names from the tree for ATS hidden list */
+function collectSkillNames(node: TreeNode): string[] {
+  const names: string[] = [node.name];
+  if (node.children) {
+    for (const child of node.children) {
+      names.push(...collectSkillNames(child));
+    }
+  }
+  return names;
+}
+
 export const SkillsSection: React.FC<SkillsSectionProps> = ({ skillTree, projects }) => {
+  const allSkills = collectSkillNames(skillTree).filter(n => n !== skillTree.name);
+
   return (
     <section id="skills" className="py-24 lg:py-32 border-t border-[#1a1a1a]">
       <div className="max-w-5xl mx-auto px-6">
@@ -33,6 +46,16 @@ export const SkillsSection: React.FC<SkillsSectionProps> = ({ skillTree, project
             </p>
           </div>
         </motion.div>
+
+        {/* Hidden skills list for ATS crawlers and search engines */}
+        <div aria-hidden="true" className="sr-only">
+          <h3>Technical Skills & Competencies</h3>
+          <ul>
+            {allSkills.map((skill, i) => (
+              <li key={i}>{skill}</li>
+            ))}
+          </ul>
+        </div>
 
         <VerticalKnowledgeTree treeData={skillTree} projects={projects} />
       </div>
