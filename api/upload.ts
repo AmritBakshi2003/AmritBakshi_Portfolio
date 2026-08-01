@@ -2,7 +2,6 @@ import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Only POST allowed
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
@@ -10,11 +9,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const body = req.body as HandleUploadBody;
 
   try {
+    // Construct standard Web Request object for @vercel/blob client helper
+    const host = req.headers.host || 'localhost';
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    const webRequest = new Request(`${protocol}://${host}/api/upload`, {
+      method: 'POST',
+      headers: req.headers as unknown as HeadersInit,
+    });
+
     const jsonResponse = await handleUpload({
       body,
-      request: req as unknown as Request,
+      request: webRequest,
       onBeforeGenerateToken: async () => {
-        // Allow images and PDFs up to 20 MB
         return {
           allowedContentTypes: [
             'image/jpeg',
@@ -25,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             'image/svg+xml',
             'application/pdf',
           ],
-          maximumSizeInBytes: 20 * 1024 * 1024, // 20 MB
+          maximumSizeInBytes: 25 * 1024 * 1024, // 25 MB
         };
       },
       onUploadCompleted: async ({ blob }) => {
