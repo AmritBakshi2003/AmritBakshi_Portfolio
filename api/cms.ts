@@ -11,15 +11,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+
   // ── GET: Load CMS data from Blob ──
   if (req.method === 'GET') {
     try {
-      // Check if BLOB_READ_WRITE_TOKEN is available
-      if (!process.env.BLOB_READ_WRITE_TOKEN) {
-        return res.status(200).json({ connected: false, data: null, message: 'BLOB_READ_WRITE_TOKEN environment variable is not set.' });
+      if (!token) {
+        return res.status(200).json({ connected: false, data: null, message: 'BLOB_READ_WRITE_TOKEN is not set.' });
       }
 
-      const { blobs } = await list({ prefix: CMS_BLOB_FILENAME });
+      const { blobs } = await list({ prefix: CMS_BLOB_FILENAME, token });
       if (blobs.length === 0) {
         return res.status(200).json({ connected: true, data: null });
       }
@@ -47,14 +48,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
+    if (!token) {
+      return res.status(500).json({ error: 'BLOB_READ_WRITE_TOKEN environment variable is missing on Vercel.' });
+    }
+
     try {
       const { data } = req.body;
       if (!data) return res.status(400).json({ error: 'No data provided' });
 
       // Delete old CMS blobs to avoid accumulation
-      const { blobs: existing } = await list({ prefix: CMS_BLOB_FILENAME });
+      const { blobs: existing } = await list({ prefix: CMS_BLOB_FILENAME, token });
       if (existing.length > 0) {
-        await Promise.all(existing.map(b => del(b.url)));
+        await Promise.all(existing.map(b => del(b.url, { token })));
       }
 
       // Write new CMS JSON blob
@@ -62,6 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         access: 'public',
         contentType: 'application/json',
         addRandomSuffix: false,
+        token,
       });
 
       return res.status(200).json({ success: true, url: blob.url });

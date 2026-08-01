@@ -7,9 +7,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const body = req.body as HandleUploadBody;
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+
+  if (!token) {
+    return res.status(500).json({ error: 'BLOB_READ_WRITE_TOKEN environment variable is missing on Vercel.' });
+  }
 
   try {
-    // Construct standard Web Request object for @vercel/blob client helper
     const host = req.headers.host || 'localhost';
     const protocol = host.includes('localhost') ? 'http' : 'https';
     const webRequest = new Request(`${protocol}://${host}/api/upload`, {
@@ -20,6 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const jsonResponse = await handleUpload({
       body,
       request: webRequest,
+      token,
       onBeforeGenerateToken: async () => {
         return {
           allowedContentTypes: [
