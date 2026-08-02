@@ -73,6 +73,10 @@ export const INITIAL_CMS_DATA: PortfolioCMSData = {
                 ]
               },
               { id: "numpy", name: "NumPy", type: "library", visibility: true },
+              { id: "matplotlib", name: "Matplotlib", type: "library", visibility: true },
+              { id: "seaborn", name: "Seaborn", type: "library", visibility: true },
+              { id: "plotly", name: "Plotly", type: "library", visibility: true },
+              { id: "openpyxl", name: "OpenPyXL", type: "library", visibility: true },
               { id: "faker", name: "Faker", type: "library", visibility: true },
               { id: "streamlit-py", name: "Streamlit", type: "framework", visibility: true },
               { id: "python-automation", name: "Automation", type: "concept", visibility: true }
@@ -80,7 +84,7 @@ export const INITIAL_CMS_DATA: PortfolioCMSData = {
           },
           {
             id: "excel",
-            name: "Excel",
+            name: "Microsoft Excel",
             type: "skill",
             experienceLevel: "Advanced",
             visibility: true,
@@ -106,6 +110,24 @@ export const INITIAL_CMS_DATA: PortfolioCMSData = {
               { id: "pbi-powerquery", name: "Power Query", type: "tool", visibility: true },
               { id: "pbi-modeling", name: "Data Modeling", type: "concept", visibility: true },
               { id: "pbi-dax", name: "DAX", type: "concept", visibility: true }
+            ]
+          },
+          {
+            id: "tableau",
+            name: "Tableau",
+            type: "skill",
+            experienceLevel: "Intermediate",
+            visibility: true
+          },
+          {
+            id: "bi-analytics-tools",
+            name: "BI & Notebook Tools",
+            type: "skill",
+            visibility: true,
+            children: [
+              { id: "google-sheets", name: "Google Sheets", type: "tool", experienceLevel: "Advanced", visibility: true },
+              { id: "jupyter-notebook", name: "Jupyter Notebook", type: "tool", experienceLevel: "Expert", visibility: true },
+              { id: "kaggle", name: "Kaggle", type: "tool", experienceLevel: "Intermediate", visibility: true }
             ]
           },
           {
@@ -168,11 +190,13 @@ export const INITIAL_CMS_DATA: PortfolioCMSData = {
             type: "skill",
             visibility: true,
             children: [
-              { id: "html", name: "HTML", type: "tool", visibility: true },
-              { id: "css", name: "CSS", type: "tool", visibility: true },
+              { id: "html", name: "HTML5", type: "tool", visibility: true },
+              { id: "css", name: "CSS3", type: "tool", visibility: true },
               { id: "javascript", name: "JavaScript", type: "tool", visibility: true },
+              { id: "typescript", name: "TypeScript", type: "tool", experienceLevel: "Advanced", visibility: true },
               { id: "react", name: "React", type: "framework", visibility: true },
-              { id: "tailwind", name: "Tailwind", type: "framework", visibility: true }
+              { id: "nextjs", name: "Next.js", type: "framework", experienceLevel: "Advanced", visibility: true },
+              { id: "tailwind", name: "Tailwind CSS", type: "framework", visibility: true }
             ]
           },
           {
@@ -181,9 +205,14 @@ export const INITIAL_CMS_DATA: PortfolioCMSData = {
             type: "skill",
             visibility: true,
             children: [
-              { id: "rest-apis", name: "REST APIs", type: "concept", visibility: true },
-              { id: "fastapi", name: "FastAPI", type: "framework", visibility: true },
               { id: "nodejs", name: "Node.js", type: "framework", visibility: true },
+              { id: "expressjs", name: "Express.js", type: "framework", experienceLevel: "Advanced", visibility: true },
+              { id: "fastapi", name: "FastAPI", type: "framework", visibility: true },
+              { id: "streamlit", name: "Streamlit", type: "framework", visibility: true },
+              { id: "mern-stack", name: "MERN Stack", type: "framework", experienceLevel: "Advanced", visibility: true },
+              { id: "rest-apis", name: "REST APIs", type: "concept", visibility: true },
+              { id: "postman", name: "Postman", type: "tool", experienceLevel: "Advanced", visibility: true },
+              { id: "razorpay", name: "Razorpay", type: "tool", experienceLevel: "Intermediate", visibility: true },
               { id: "jwt", name: "JWT", type: "concept", visibility: true },
               { id: "api-integration", name: "API Integration", type: "concept", visibility: true }
             ]
@@ -195,21 +224,33 @@ export const INITIAL_CMS_DATA: PortfolioCMSData = {
             visibility: true,
             children: [
               { id: "mongodb", name: "MongoDB", type: "database", visibility: true },
+              { id: "mongodb-atlas", name: "MongoDB Atlas", type: "database", experienceLevel: "Advanced", visibility: true },
               { id: "postgresql-dev", name: "PostgreSQL", type: "database", visibility: true },
-              { id: "sqlite-dev", name: "SQLite", type: "database", visibility: true }
+              { id: "sqlite-dev", name: "SQLite", type: "database", visibility: true },
+              { id: "redis", name: "Redis", type: "database", experienceLevel: "Beginner", visibility: true }
             ]
           },
           {
             id: "deployment",
-            name: "Deployment",
+            name: "Cloud & Deployment",
             type: "skill",
             visibility: true,
             children: [
               { id: "git", name: "Git", type: "tool", visibility: true },
               { id: "github", name: "GitHub", type: "tool", visibility: true },
+              { id: "vscode", name: "VS Code", type: "tool", experienceLevel: "Expert", visibility: true },
+              { id: "npm", name: "npm", type: "tool", experienceLevel: "Advanced", visibility: true },
+              { id: "vite", name: "Vite", type: "tool", experienceLevel: "Advanced", visibility: true },
+              { id: "docker", name: "Docker", type: "tool", experienceLevel: "Intermediate", visibility: true },
+              { id: "github-actions", name: "GitHub Actions", type: "tool", experienceLevel: "Intermediate", visibility: true },
               { id: "aws", name: "AWS", type: "tool", visibility: true },
+              { id: "s3", name: "AWS S3", type: "tool", visibility: true },
               { id: "cloudfront", name: "CloudFront", type: "tool", visibility: true },
-              { id: "s3", name: "S3", type: "tool", visibility: true }
+              { id: "elastic-beanstalk", name: "Elastic Beanstalk", type: "tool", experienceLevel: "Intermediate", visibility: true },
+              { id: "nginx", name: "Nginx", type: "tool", experienceLevel: "Intermediate", visibility: true },
+              { id: "vercel", name: "Vercel", type: "tool", experienceLevel: "Advanced", visibility: true },
+              { id: "cloudflare", name: "Cloudflare", type: "tool", experienceLevel: "Intermediate", visibility: true },
+              { id: "netlify", name: "Netlify", type: "tool", experienceLevel: "Intermediate", visibility: true }
             ]
           }
         ]
@@ -224,6 +265,15 @@ export const INITIAL_CMS_DATA: PortfolioCMSData = {
         visibility: true,
         isExpanded: true,
         children: [
+          { id: "chatgpt", name: "ChatGPT", type: "tool", experienceLevel: "Expert", visibility: true },
+          { id: "claude", name: "Claude", type: "tool", experienceLevel: "Expert", visibility: true },
+          { id: "gemini", name: "Gemini", type: "tool", experienceLevel: "Expert", visibility: true },
+          { id: "cursor-ai", name: "Cursor AI", type: "tool", experienceLevel: "Expert", visibility: true },
+          { id: "github-copilot", name: "GitHub Copilot", type: "tool", experienceLevel: "Advanced", visibility: true },
+          { id: "openai-api", name: "OpenAI API", type: "tool", experienceLevel: "Advanced", visibility: true },
+          { id: "gemini-api", name: "Gemini API", type: "tool", experienceLevel: "Advanced", visibility: true },
+          { id: "langchain", name: "LangChain", type: "framework", experienceLevel: "Intermediate", visibility: true },
+          { id: "ollama", name: "Ollama", type: "tool", experienceLevel: "Intermediate", visibility: true },
           { id: "synth-data", name: "Synthetic Data", type: "concept", visibility: true },
           { id: "data-annot", name: "Data Annotation", type: "concept", visibility: true },
           { id: "data-label", name: "Data Labeling", type: "concept", visibility: true },
@@ -234,7 +284,7 @@ export const INITIAL_CMS_DATA: PortfolioCMSData = {
         ]
       },
 
-      // 4. UI / UX
+      // 4. UI / UX DESIGN
       {
         id: "domain-ui-ux",
         name: "UI / UX Design",
@@ -256,6 +306,9 @@ export const INITIAL_CMS_DATA: PortfolioCMSData = {
             ]
           },
           { id: "canva", name: "Canva", type: "tool", visibility: true },
+          { id: "framer", name: "Framer", type: "tool", experienceLevel: "Advanced", visibility: true },
+          { id: "webflow", name: "Webflow", type: "tool", experienceLevel: "Intermediate", visibility: true },
+          { id: "wordpress", name: "WordPress", type: "tool", experienceLevel: "Intermediate", visibility: true },
           {
             id: "user-experience",
             name: "User Experience",
@@ -327,7 +380,7 @@ export const INITIAL_CMS_DATA: PortfolioCMSData = {
         "Validated pipeline against FIFA World Cup 2026 Player Performance Dataset (Kaggle, 54,600 records), achieving a 94.3% overall data quality score while preserving statistical distributions.",
         "Integrated analytics dashboard comparing original vs. synthetic datasets through statistical distribution, correlation matrix analysis, feature importance, and outlier detection."
       ],
-      techStack: ["Python", "Pandas", "NumPy", "Streamlit", "SQLite", "Faker", "SciPy"],
+      techStack: ["Python", "Pandas", "NumPy", "Streamlit", "SQLite", "Faker", "OpenPyXL", "SciPy"],
       metrics: [
         { label: "Generation Speed", value: "100k+ records < 11s" },
         { label: "Data Quality Score", value: "94.3%" },
@@ -337,9 +390,64 @@ export const INITIAL_CMS_DATA: PortfolioCMSData = {
       githubUrl: "https://github.com",
       liveUrl: "https://streamlit.io",
       mediaIds: ["media_profile_avatar"],
-      tags: ["Data Engineering", "Synthetic Data", "Streamlit", "Python"],
+      tags: ["Data Engineering", "Synthetic Data", "Streamlit", "Python", "OpenPyXL"],
       visibility: true,
       sortOrder: 1,
+      lastModified: "2026-08-01",
+      featured: true
+    },
+    {
+      id: "rocketrybox",
+      title: "RocketryBox — E-Commerce & Subscription Management Platform",
+      subtitle: "Full-stack MERN subscription application with Redis caching & Razorpay gateway",
+      period: "Jun 2025 – Nov 2025",
+      category: "Full-Stack Web Development",
+      description: "Architected a full-stack e-commerce and subscription platform supporting automated billing, JWT-secured authentication, Redis caching, and MongoDB Atlas database clustering.",
+      highlights: [
+        "Implemented JWT authentication and role-based access control for subscription tier management.",
+        "Integrated Razorpay payment gateway API for seamless checkout processing and automated webhooks.",
+        "Configured MongoDB Atlas cloud database with Redis caching to optimize database queries.",
+        "Deployed backend architecture on AWS Elastic Beanstalk with Nginx reverse proxy."
+      ],
+      techStack: ["React", "TypeScript", "Node.js", "Express.js", "MongoDB Atlas", "Redis", "JWT", "Razorpay", "AWS S3", "CloudFront", "Elastic Beanstalk", "Nginx"],
+      metrics: [
+        { label: "Architecture", value: "MERN Stack" },
+        { label: "Database", value: "MongoDB Atlas" },
+        { label: "Payments", value: "Razorpay Integrated" }
+      ],
+      githubUrl: "https://github.com",
+      liveUrl: "#",
+      mediaIds: [],
+      tags: ["Full-Stack", "React", "Node.js", "MongoDB Atlas", "Razorpay", "Redis"],
+      visibility: true,
+      sortOrder: 2,
+      lastModified: "2026-08-01",
+      featured: true
+    },
+    {
+      id: "aerwok-platform",
+      title: "Aerwok — Web Engineering & Client Digital Suite",
+      subtitle: "Next.js, Jamstack, and UI/UX design suite for startups & small businesses",
+      period: "Sep 2024 – Dec 2025",
+      category: "Web Engineering & Design",
+      description: "Co-founded and engineered web applications and UI/UX design systems for client startups using modern full-stack web technologies including Next.js, Framer, Webflow, and WordPress.",
+      highlights: [
+        "Built high-performance web applications using Next.js, Framer, Webflow, and WordPress.",
+        "Designed 20+ wireframes and responsive UI components in Figma and Canva.",
+        "Managed deployment workflows on AWS, Vercel, and Cloudflare."
+      ],
+      techStack: ["Next.js", "MERN Stack", "Framer", "Webflow", "WordPress", "Figma", "AWS", "Cursor AI", "Cloudflare", "Vercel"],
+      metrics: [
+        { label: "Client Engagements", value: "5+ Projects" },
+        { label: "Design System", value: "20+ Wireframes" },
+        { label: "Framework", value: "Next.js / MERN" }
+      ],
+      githubUrl: "https://github.com",
+      liveUrl: "#",
+      mediaIds: [],
+      tags: ["Next.js", "Framer", "WordPress", "Webflow", "UI/UX"],
+      visibility: true,
+      sortOrder: 3,
       lastModified: "2026-08-01",
       featured: true
     }
@@ -542,10 +650,76 @@ export const INITIAL_CMS_DATA: PortfolioCMSData = {
       usage: "Lightweight embedded database used to persist user sessions, schema definitions, and generation run history across app restarts without requiring a separate server."
     },
     {
+      id: "pl_openpyxl_synthslm",
+      projectId: "synthslm",
+      nodeId: "openpyxl",
+      usage: "Used for reading, writing, and formatting Excel (.xlsx) workbooks directly from synthetic generation pipelines."
+    },
+    {
       id: "pl_faker_synthslm",
       projectId: "synthslm",
       nodeId: "faker",
       usage: "Realistic fake-data provider for text and categorical columns — names, addresses, emails, and domain-specific strings generated to match schema type annotations."
+    },
+    {
+      id: "pl_mongodb_rocketrybox",
+      projectId: "rocketrybox",
+      nodeId: "mongodb-atlas",
+      usage: "Cloud database cluster for managing user accounts, product catalogs, order history, and subscription tiers."
+    },
+    {
+      id: "pl_redis_rocketrybox",
+      projectId: "rocketrybox",
+      nodeId: "redis",
+      usage: "In-memory data store for caching user session tokens and reducing database query load during peak traffic."
+    },
+    {
+      id: "pl_razorpay_rocketrybox",
+      projectId: "rocketrybox",
+      nodeId: "razorpay",
+      usage: "Payment gateway integration handling automated recurring subscription billing and webhook notifications."
+    },
+    {
+      id: "pl_express_rocketrybox",
+      projectId: "rocketrybox",
+      nodeId: "expressjs",
+      usage: "RESTful API backend framework powering authentication, order processing, and webhooks."
+    },
+    {
+      id: "pl_typescript_rocketrybox",
+      projectId: "rocketrybox",
+      nodeId: "typescript",
+      usage: "End-to-end type safety for API requests, state management, and database models."
+    },
+    {
+      id: "pl_nextjs_aerwok",
+      projectId: "aerwok-platform",
+      nodeId: "nextjs",
+      usage: "Server-side rendered web applications built for speed, SEO, and dynamic client user experiences."
+    },
+    {
+      id: "pl_framer_aerwok",
+      projectId: "aerwok-platform",
+      nodeId: "framer",
+      usage: "Interactive animations, prototype interactions, and fluid UI layout transitions across client web sites."
+    },
+    {
+      id: "pl_webflow_aerwok",
+      projectId: "aerwok-platform",
+      nodeId: "webflow",
+      usage: "Rapid visual web development platform used to deliver responsive landing pages for startup clients."
+    },
+    {
+      id: "pl_wordpress_aerwok",
+      projectId: "aerwok-platform",
+      nodeId: "wordpress",
+      usage: "Content management system setup and theme customization for client business sites."
+    },
+    {
+      id: "pl_cursor_aerwok",
+      projectId: "aerwok-platform",
+      nodeId: "cursor-ai",
+      usage: "AI-assisted IDE used for rapid prototyping, component generation, and full-stack code refactoring."
     }
   ],
   adminPasscode: "admin123"

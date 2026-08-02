@@ -23,18 +23,52 @@ import { SEOHead } from './components/common/SEOHead';
 // Admin (unchanged)
 import { AdminCMS } from './components/admin/AdminCMS';
 
-const CMS_STORAGE_KEY = 'AMRIT_BAKSHI_CMS_DATA_V3';
+const CMS_STORAGE_KEY = 'AMRIT_BAKSHI_CMS_DATA_V5';
+
+function mergeTreeNodes(defaultNode: any, savedNode: any): any {
+  if (!savedNode) return defaultNode;
+  const mergedChildrenMap = new Map<string, any>();
+  for (const child of savedNode.children ?? []) {
+    mergedChildrenMap.set(child.id, child);
+  }
+  for (const defaultChild of defaultNode.children ?? []) {
+    if (!mergedChildrenMap.has(defaultChild.id)) {
+      mergedChildrenMap.set(defaultChild.id, defaultChild);
+    } else {
+      const existing = mergedChildrenMap.get(defaultChild.id);
+      mergedChildrenMap.set(defaultChild.id, mergeTreeNodes(defaultChild, existing));
+    }
+  }
+  return {
+    ...defaultNode,
+    ...savedNode,
+    children: Array.from(mergedChildrenMap.values()),
+  };
+}
 
 // ── Merge saved data with INITIAL defaults (handles new fields added across updates) ──
 function mergeWithDefaults(saved: PortfolioCMSData): PortfolioCMSData {
+  const mergedProjectsMap = new Map<string, any>();
+  for (const p of saved.projects ?? []) mergedProjectsMap.set(p.id, p);
+  for (const p of INITIAL_CMS_DATA.projects) {
+    if (!mergedProjectsMap.has(p.id)) mergedProjectsMap.set(p.id, p);
+  }
+
+  const mergedLinksMap = new Map<string, any>();
+  for (const l of saved.projectLinks ?? []) mergedLinksMap.set(l.id, l);
+  for (const l of INITIAL_CMS_DATA.projectLinks ?? []) {
+    if (!mergedLinksMap.has(l.id)) mergedLinksMap.set(l.id, l);
+  }
+
   const merged: PortfolioCMSData = {
     ...INITIAL_CMS_DATA,
     ...saved,
+    skillTree: saved.skillTree ? mergeTreeNodes(INITIAL_CMS_DATA.skillTree, saved.skillTree) : INITIAL_CMS_DATA.skillTree,
+    projects: Array.from(mergedProjectsMap.values()),
+    projectLinks: Array.from(mergedLinksMap.values()),
     profile: { ...INITIAL_CMS_DATA.profile, ...saved.profile },
     sectionVisibility: { ...INITIAL_CMS_DATA.sectionVisibility, ...saved.sectionVisibility },
     achievements: saved.achievements ?? INITIAL_CMS_DATA.achievements,
-    // Migrate: projectLinks didn't exist in older schema versions
-    projectLinks: saved.projectLinks ?? INITIAL_CMS_DATA.projectLinks ?? [],
   };
   if (!merged.profile.resumeUrl || merged.profile.resumeUrl === '#') {
     merged.profile.resumeUrl = '/Amrit_Bakshi_Resume.pdf';
