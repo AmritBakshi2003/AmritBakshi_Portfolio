@@ -229,7 +229,7 @@ const ConnectorLines: React.FC<ConnectorProps> = ({
           display: 'inline-flex',
           flexDirection: 'column',
           alignItems: 'center',
-          width: '250px',
+          width: '100px',
           flexShrink: 0,
           alignSelf: 'stretch',
           position: 'relative',
@@ -289,7 +289,7 @@ const ConnectorLines: React.FC<ConnectorProps> = ({
                 position: 'absolute',
                 left: '14px',
                 top: 'calc(50% - 1px)',
-                width: '240px',
+                width: '90px',
                 height: '2px',
                 backgroundColor: elbowColor,
                 borderRadius: '1px',
@@ -303,7 +303,7 @@ const ConnectorLines: React.FC<ConnectorProps> = ({
               className={`kt-line-draw ${state.isElbowActive ? 'kt-line-active' : ''}`}
               style={{
                 position: 'absolute',
-                left: '250px',
+                left: '100px',
                 top: 'calc(50% - 5px)',
               }}
             >
