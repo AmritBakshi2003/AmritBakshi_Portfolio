@@ -248,3 +248,91 @@
   background: var(--accent);
   margin-top: 1px;
 }
+
+/* =========================================================
+   KNOWLEDGE TREE V2 — Black & Yellow Theme & Animated Connectors
+   ========================================================= */
+:root {
+  --kt-yellow: #F2C230;
+  --kt-yellow-tint: rgba(242, 194, 48, 0.14);
+  --kt-yellow-border: rgba(242, 194, 48, 0.35);
+  --kt-line-dim: #3a3a3a;
+}
+
+.tree-node-v2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  border: 1px solid transparent;
+}
+.tree-node-v2:hover {
+  background-color: #1a1a1a;
+}
+.tree-node-v2.active-row {
+  background-color: var(--kt-yellow-tint);
+  border-color: var(--kt-yellow-border);
+  color: #ffffff;
+}
+.tree-node-v2.route-row {
+  background-color: rgba(242, 194, 48, 0.05);
+  border-color: rgba(242, 194, 48, 0.15);
+  color: #e0e0e0;
+}
+
+/* Connector Line Animations */
+@keyframes kt-line-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes kt-line-draw {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .kt-line-active {
+    animation: kt-line-pulse 1.8s ease-in-out infinite;
+  }
+  .kt-line-draw {
+    transform-origin: top;
+    animation: kt-line-draw 0.35s ease-out forwards;
+  }
+}
+
+/* Smart Tree Scrollbar */
+.custom-tree-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #282828 #0d0d0d;
+}
+.custom-tree-scrollbar::-webkit-scrollbar {
+  width: 7px;
+}
+.custom-tree-scrollbar::-webkit-scrollbar-track {
+  background: #0d0d0d;
+  border-radius: 8px;
+}
+.custom-tree-scrollbar::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 8px;
+  border: 1px solid #1f1f1f;
+  transition: background-color 0.2s ease;
+}
+.custom-tree-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #F2C230;
+}
+
+

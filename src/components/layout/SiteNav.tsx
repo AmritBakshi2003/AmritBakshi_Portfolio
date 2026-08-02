@@ -8,7 +8,7 @@ interface SiteNavProps {
   resumeUrl: string;
 }
 
-const SECTION_LABELS: Record<keyof SectionVisibility, string> = {
+const SECTION_LABELS: Partial<Record<keyof SectionVisibility, string>> = {
   hero: 'Home',
   about: 'About',
   skills: 'Skills',

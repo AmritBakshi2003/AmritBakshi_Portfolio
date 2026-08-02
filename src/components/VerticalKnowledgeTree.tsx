@@ -1,43 +1,37 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { TreeNode, Project } from '../types/cms';
+import type { TreeNode, Project, ProjectLink } from '../types/cms';
+import { BrandLogo } from './common/BrandLogo';
 import {
-  ChevronRight, Search, X, FolderGit2,
-  Layers, Cpu, Code, BookOpen, Database, Wrench,
-  Briefcase, Sparkles, Hash
+  ChevronRight, Search, X, FolderGit2, ExternalLink
 } from 'lucide-react';
 
 interface VerticalKnowledgeTreeProps {
   treeData: TreeNode;
   projects: Project[];
+  projectLinks: ProjectLink[];
+  highlightedNodeId?: string | null;
 }
 
-// ── Domain color palette (matches original tree data)
-const DOMAIN_COLORS: Record<string, string> = {
-  'domain-data-analytics': '#6366f1',
-  'domain-software-dev':   '#3b82f6',
-  'domain-ai-data':        '#10b981',
-  'domain-ui-ux':          '#a855f7',
-  'domain-professional':   '#f59e0b',
-  'domain-domains-explored': '#f43f5e',
-};
+// ── Yellow Accent Color Constant ──
+const YELLOW_ACCENT = '#F2C230';
+const DIM_LINE_COLOR = '#3a3a3a';
+const EXPAND_STORAGE_KEY = 'kt_expand_state';
 
-const getNodeIcon = (type: string, size = 14) => {
-  const props = { size, strokeWidth: 1.75 };
-  switch (type) {
-    case 'domain':            return <Layers {...props} />;
-    case 'skill':             return <Cpu {...props} />;
-    case 'sub_skill':         return <Code {...props} />;
-    case 'library':           return <BookOpen {...props} />;
-    case 'database':          return <Database {...props} />;
-    case 'framework':         return <Wrench {...props} />;
-    case 'professional_skill':return <Briefcase {...props} />;
-    case 'concept':           return <Hash {...props} />;
-    default:                  return <Sparkles {...props} />;
-  }
-};
+function loadExpandState(defaultIds: Set<string>): Set<string> {
+  try {
+    const raw = localStorage.getItem(EXPAND_STORAGE_KEY);
+    if (raw) return new Set(JSON.parse(raw) as string[]);
+  } catch (_) { }
+  return defaultIds;
+}
 
-// ── Utilities
+function saveExpandState(ids: Set<string>) {
+  try {
+    localStorage.setItem(EXPAND_STORAGE_KEY, JSON.stringify([...ids]));
+  } catch (_) { }
+}
+
 function findNode(node: TreeNode, id: string): TreeNode | null {
   if (node.id === id) return node;
   for (const child of node.children ?? []) {
@@ -57,11 +51,42 @@ function findBreadcrumb(node: TreeNode, id: string, path: TreeNode[] = []): Tree
   return null;
 }
 
-// Collect all node IDs that match search AND their ancestor IDs
-function collectMatchingIds(node: TreeNode, q: string): Set<string> {
+// Ordered list of visible node IDs for keyboard nav
+function collectVisibleIds(
+  node: TreeNode,
+  expandedIds: Set<string>,
+  isSearching: boolean,
+  matchingIds: Set<string>,
+  result: string[] = []
+): string[] {
+  const isVisible = !isSearching || matchingIds.has(node.id);
+  if (!isVisible) return result;
+  result.push(node.id);
+  if (expandedIds.has(node.id) && node.children) {
+    for (const child of node.children) {
+      collectVisibleIds(child, expandedIds, isSearching, matchingIds, result);
+    }
+  }
+  return result;
+}
+
+// Search matching node IDs + ancestors + project title matches
+function collectMatchingIds(
+  node: TreeNode,
+  q: string,
+  projectLinks: ProjectLink[],
+  projects: Project[]
+): Set<string> {
   const result = new Set<string>();
   function recurse(n: TreeNode, ancestorIds: string[]): boolean {
-    const match = n.name.toLowerCase().includes(q) || (n.description ?? '').toLowerCase().includes(q);
+    const nameMatch = n.name.toLowerCase().includes(q) || (n.description ?? '').toLowerCase().includes(q);
+    const projectMatch = projectLinks
+      .filter(l => l.nodeId === n.id)
+      .some(l => {
+        const proj = projects.find(p => p.id === l.projectId);
+        return proj?.title.toLowerCase().includes(q) || proj?.category.toLowerCase().includes(q);
+      });
+    const match = nameMatch || projectMatch;
     let childMatch = false;
     const nextAncestors = [...ancestorIds, n.id];
     for (const child of n.children ?? []) {
@@ -77,15 +102,394 @@ function collectMatchingIds(node: TreeNode, q: string): Set<string> {
   return result;
 }
 
-// ── Sub-component: a single tree row
+// Active path derivation — strict ancestor chain highlighting (stops at collapsed ancestor nodes)
+function deriveActivePath(
+  treeData: TreeNode,
+  selectedId: string | null,
+  expandedIds: Set<string>
+): Set<string> {
+  if (!selectedId) return new Set();
+  const chain = findBreadcrumb(treeData, selectedId) ?? [];
+  const activePath = new Set<string>();
+
+  for (const n of chain) {
+    activePath.add(n.id);
+    // Skip early-stop check for the root node — it is never stored in expandedIds
+    // but is always conceptually expanded (its children are the visible domain rows).
+    if (n.id === treeData.id) continue;
+    // If an intermediate ancestor has children but is NOT expanded, stop here
+    if (n.id !== selectedId && (n.children?.length ?? 0) > 0 && !expandedIds.has(n.id)) {
+      break;
+    }
+  }
+  return activePath;
+}
+
+
+// ── Helper to calculate strict route active states for connector lines ──
+function getActiveLineStates(
+  treeData: TreeNode,
+  activePath: Set<string>,
+  nodeId: string,
+  ancestorIds: string[],
+  depth: number
+) {
+  const lineStates: Array<{
+    isTopVerticalActive: boolean;
+    isBottomVerticalActive: boolean;
+    isElbowActive: boolean;
+  }> = [];
+
+  for (let d = 0; d < depth; d++) {
+    const parentId = ancestorIds[d];
+    if (!parentId || !activePath.has(parentId)) {
+      lineStates.push({ isTopVerticalActive: false, isBottomVerticalActive: false, isElbowActive: false });
+      continue;
+    }
+
+    const parentNode = findNode(treeData, parentId);
+    if (!parentNode || !parentNode.children) {
+      lineStates.push({ isTopVerticalActive: false, isBottomVerticalActive: false, isElbowActive: false });
+      continue;
+    }
+
+    const activeChild = parentNode.children.find(c => activePath.has(c.id));
+    if (!activeChild) {
+      lineStates.push({ isTopVerticalActive: false, isBottomVerticalActive: false, isElbowActive: false });
+      continue;
+    }
+
+    const activeChildIdx = parentNode.children.findIndex(c => c.id === activeChild.id);
+    const currentBranchChildId = (d + 1 < ancestorIds.length) ? ancestorIds[d + 1] : nodeId;
+    const currentBranchChildIdx = parentNode.children.findIndex(c => c.id === currentBranchChildId);
+
+    if (currentBranchChildIdx < 0) {
+      lineStates.push({ isTopVerticalActive: false, isBottomVerticalActive: false, isElbowActive: false });
+      continue;
+    }
+
+    const isElbow = (d === depth - 1);
+
+    if (currentBranchChildIdx < activeChildIdx) {
+      // Row is ABOVE active child: trunk passes down through this row to reach active child below
+      lineStates.push({
+        isTopVerticalActive: true,
+        isBottomVerticalActive: true,
+        isElbowActive: false
+      });
+    } else if (currentBranchChildIdx === activeChildIdx) {
+      // Row IS the active child branch (or contains it)
+      lineStates.push({
+        isTopVerticalActive: true,
+        isBottomVerticalActive: !isElbow, // If not elbow, trunk continues down into sub-branch; if elbow, trunk ends at elbow
+        isElbowActive: isElbow
+      });
+    } else {
+      // Row is BELOW active child branch: active path already turned off to active child above
+      lineStates.push({
+        isTopVerticalActive: false,
+        isBottomVerticalActive: false,
+        isElbowActive: false
+      });
+    }
+  }
+
+  return lineStates;
+}
+
+// ── Connector Guide Lines Component with Draw-in & Pulse Animations ──
+interface ConnectorProps {
+  depth: number;
+  isLastSibling: boolean;
+  activePath: Set<string>;
+  nodeId: string;
+  ancestorIds: string[];
+  treeData: TreeNode;
+}
+
+const ConnectorLines: React.FC<ConnectorProps> = ({
+  depth, isLastSibling, activePath, nodeId, ancestorIds, treeData
+}) => {
+  const lineStates = getActiveLineStates(treeData, activePath, nodeId, ancestorIds, depth);
+  const segments: React.ReactNode[] = [];
+
+  for (let d = 0; d < depth; d++) {
+    const isElbow = (d === depth - 1);
+    const state = lineStates[d] || { isTopVerticalActive: false, isBottomVerticalActive: false, isElbowActive: false };
+
+    const topColor = state.isTopVerticalActive ? YELLOW_ACCENT : DIM_LINE_COLOR;
+    const bottomColor = state.isBottomVerticalActive ? YELLOW_ACCENT : DIM_LINE_COLOR;
+    const elbowColor = state.isElbowActive ? YELLOW_ACCENT : DIM_LINE_COLOR;
+
+    segments.push(
+      <span
+        key={d}
+        aria-hidden="true"
+        style={{
+          display: 'inline-flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          width: '250px',
+          flexShrink: 0,
+          alignSelf: 'stretch',
+          position: 'relative',
+        }}
+      >
+        {/* Vertical guide line (for ancestor levels before elbow) */}
+        {!isElbow && (
+          <span
+            className={`kt-line-draw ${state.isTopVerticalActive ? 'kt-line-active' : ''}`}
+            style={{
+              position: 'absolute',
+              left: '14px',
+              top: 0,
+              bottom: 0,
+              width: '2px',
+              backgroundColor: topColor,
+              borderRadius: '1px',
+            }}
+          />
+        )}
+
+        {/* Elbow: top vertical + bottom vertical + horizontal arm + arrowhead */}
+        {isElbow && (
+          <>
+            {/* Top vertical line */}
+            <span
+              className={`kt-line-draw ${state.isTopVerticalActive ? 'kt-line-active' : ''}`}
+              style={{
+                position: 'absolute',
+                left: '14px',
+                top: 0,
+                height: '50%',
+                width: '2px',
+                backgroundColor: topColor,
+                borderRadius: '1px',
+              }}
+            />
+            {/* Bottom vertical line */}
+            {!isLastSibling && (
+              <span
+                className={`kt-line-draw ${state.isBottomVerticalActive ? 'kt-line-active' : ''}`}
+                style={{
+                  position: 'absolute',
+                  left: '14px',
+                  top: '50%',
+                  bottom: 0,
+                  width: '2px',
+                  backgroundColor: bottomColor,
+                  borderRadius: '1px',
+                }}
+              />
+            )}
+            {/* Horizontal elbow arm */}
+            <span
+              className={`kt-line-draw ${state.isElbowActive ? 'kt-line-active' : ''}`}
+              style={{
+                position: 'absolute',
+                left: '14px',
+                top: 'calc(50% - 1px)',
+                width: '240px',
+                height: '2px',
+                backgroundColor: elbowColor,
+                borderRadius: '1px',
+              }}
+            />
+            {/* Arrowhead pointing right at line tip */}
+            <svg
+              width="8"
+              height="10"
+              viewBox="0 0 8 10"
+              className={`kt-line-draw ${state.isElbowActive ? 'kt-line-active' : ''}`}
+              style={{
+                position: 'absolute',
+                left: '250px',
+                top: 'calc(50% - 5px)',
+              }}
+            >
+              <polygon points="0,1 8,5 0,9" fill={elbowColor} />
+            </svg>
+          </>
+        )}
+      </span>
+    );
+  }
+  return <>{segments}</>;
+};
+
+// ── Inline Detail Panel Component (Renders directly beneath clicked row) ──
+interface InlineDetailPanelProps {
+  node: TreeNode;
+  treeData: TreeNode;
+  projects: Project[];
+  projectLinks: ProjectLink[];
+  onSelectNode: (id: string) => void;
+  onExpandParent: (parentId: string) => void;
+  onClose: () => void;
+}
+
+const InlineDetailPanel: React.FC<InlineDetailPanelProps> = ({
+  node, treeData, projects, projectLinks, onSelectNode, onExpandParent, onClose
+}) => {
+  const breadcrumb = findBreadcrumb(treeData, node.id) ?? [];
+  const nodeLinks = projectLinks.filter(l => l.nodeId === node.id);
+  const linkedProjectCards = nodeLinks
+    .map(l => {
+      const proj = projects.find(p => p.id === l.projectId);
+      if (!proj) return null; // Null-guard for stale links
+      return { link: l, proj };
+    })
+    .filter(Boolean) as Array<{ link: ProjectLink; proj: Project }>;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0, y: -6 }}
+      animate={{ opacity: 1, height: 'auto', y: 0 }}
+      exit={{ opacity: 0, height: 0, y: -6 }}
+      transition={{ duration: 0.22, ease: 'easeInOut' }}
+      className="overflow-hidden my-2 mx-1 rounded-xl border border-[#262626] bg-[#141414] p-4 text-xs shadow-xl relative"
+    >
+      {/* Breadcrumb Trail + Close Button */}
+      <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-[#222]">
+        {breadcrumb.length > 1 ? (
+          <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-neutral-400">
+            {breadcrumb.slice(1).map((b, i, arr) => (
+              <React.Fragment key={b.id}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectNode(b.id);
+                  }}
+                  className={`hover:text-[#F2C230] transition-colors truncate max-w-[120px] ${i === arr.length - 1 ? 'text-[#F2C230] font-semibold' : 'text-neutral-400'
+                    }`}
+                >
+                  {b.name}
+                </button>
+                {i < arr.length - 1 && <span className="text-neutral-600">›</span>}
+              </React.Fragment>
+            ))}
+          </div>
+        ) : <div />}
+
+        {/* Close Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          className="p-1 rounded-lg text-neutral-400 hover:text-white hover:bg-[#222] transition-colors shrink-0"
+          title="Close details"
+          aria-label="Close detail panel"
+        >
+          <X size={15} />
+        </button>
+      </div>
+
+      {/* Header Info */}
+      <div className="flex items-start gap-3 mb-3">
+        <span className="mt-0.5 p-1.5 rounded-lg bg-[#222] text-[#F2C230] shrink-0">
+          <BrandLogo name={node.name} type={node.type} size={18} />
+        </span>
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="text-base font-bold text-white tracking-tight">{node.name}</h4>
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono capitalize bg-[#222] text-neutral-300 border border-[#333]">
+              {node.type.replace('_', ' ')}
+            </span>
+            {node.experienceLevel && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#2a2410] text-[#F2C230] border border-[#524115]">
+                {node.experienceLevel}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Overview Description */}
+      {node.description && (
+        <div className="mb-3 text-neutral-300 leading-relaxed text-xs">
+          {node.description}
+        </div>
+      )}
+
+      {/* Child Badges "Includes (N)" */}
+      {node.children && node.children.length > 0 && (
+        <div className="mb-3">
+          <p className="text-[10px] font-mono text-neutral-400 uppercase tracking-wider mb-1.5">
+            Includes ({node.children.length})
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {node.children.map(child => (
+              <button
+                key={child.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onExpandParent(node.id);
+                  onSelectNode(child.id);
+                }}
+                className="px-2 py-1 rounded bg-[#222] border border-[#333] text-neutral-300 hover:text-[#F2C230] hover:border-[#F2C230]/40 text-[11px] transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <BrandLogo name={child.name} type={child.type} size={12} />
+                <span>{child.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* "Applied in Projects" Cards */}
+      {linkedProjectCards.length > 0 && (
+        <div className="pt-3 border-t border-[#222]">
+          <p className="text-[10px] font-mono text-[#F2C230] uppercase tracking-wider mb-2 flex items-center gap-1.5 font-semibold">
+            <FolderGit2 size={12} />
+            Applied in Projects ({linkedProjectCards.length})
+          </p>
+          <div className="space-y-2">
+            {linkedProjectCards.map(({ link, proj }) => (
+              <div
+                key={link.id}
+                className="bg-[#181818] border border-[#2a2a2a] rounded-lg p-3 hover:border-[#444] transition-colors"
+                style={{ borderLeft: `3px solid ${YELLOW_ACCENT}` }}
+              >
+                <a
+                  href="#projects"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById('projects')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="text-xs font-bold text-white hover:text-[#F2C230] transition-colors flex items-center gap-1 group"
+                >
+                  <span>{proj.title}</span>
+                  <ExternalLink size={11} className="opacity-60 group-hover:opacity-100 text-[#F2C230] transition-opacity" />
+                </a>
+                <p className="text-[10px] text-neutral-400 font-mono mt-0.5">{proj.category}</p>
+                {link.usage && (
+                  <p className="text-[11px] text-neutral-300 leading-relaxed mt-1.5 pt-1.5 border-t border-[#262626]">
+                    {link.usage}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+// ── Single Tree Row Component ──
 interface TreeRowProps {
   node: TreeNode;
   depth: number;
   isExpanded: boolean;
   isSelected: boolean;
-  isVisible: boolean;        // passes search filter
-  isSearchMatch: boolean;    // exact match (not just ancestor)
-  domainColor: string;
+  isVisible: boolean;
+  isSearchMatch: boolean;
+  isOnActivePath: boolean;
+  isLastSibling: boolean;
+  ancestorIds: string[];
+  activePath: Set<string>;
+  treeData: TreeNode;
   onToggle: (id: string) => void;
   onSelect: (id: string) => void;
   nodeRef?: React.RefObject<HTMLDivElement | null>;
@@ -93,10 +497,12 @@ interface TreeRowProps {
 
 const TreeRow: React.FC<TreeRowProps> = ({
   node, depth, isExpanded, isSelected, isVisible, isSearchMatch,
-  domainColor, onToggle, onSelect, nodeRef
+  isOnActivePath, isLastSibling, ancestorIds, activePath, treeData,
+  onToggle, onSelect, nodeRef
 }) => {
   if (!isVisible) return null;
   const hasChildren = (node.children?.length ?? 0) > 0;
+  const domainDepth = depth - 1; // 0 for domains
 
   return (
     <div
@@ -105,15 +511,27 @@ const TreeRow: React.FC<TreeRowProps> = ({
       aria-expanded={hasChildren ? isExpanded : undefined}
       aria-selected={isSelected}
       tabIndex={isSelected ? 0 : -1}
-      className={`tree-node ${isSelected ? 'selected' : ''} ${isSearchMatch && !isSelected ? 'bg-indigo-500/5 border-indigo-500/10' : ''}`}
-      style={{ paddingLeft: `${depth * 16 + 8}px` }}
+      className={`tree-node-v2 ${isSelected ? 'active-row' : isOnActivePath ? 'route-row' : ''} ${isSearchMatch && !isSelected && !isOnActivePath ? 'bg-[#222] border-[#444]' : ''
+        }`}
       onClick={() => onSelect(node.id)}
     >
-      {/* Expand caret */}
+      {/* Connector lines for sub-domain depths */}
+      {domainDepth > 0 && (
+        <ConnectorLines
+          depth={domainDepth}
+          isLastSibling={isLastSibling}
+          activePath={activePath}
+          nodeId={node.id}
+          ancestorIds={ancestorIds.slice(1)}
+          treeData={treeData}
+        />
+      )}
+
+      {/* Expand/Collapse Caret */}
       {hasChildren ? (
         <button
           tabIndex={-1}
-          className="shrink-0 p-0.5 rounded text-neutral-600 hover:text-neutral-300 transition-colors"
+          className="shrink-0 p-0.5 rounded text-neutral-500 hover:text-white transition-colors"
           onClick={(e) => { e.stopPropagation(); onToggle(node.id); }}
           aria-label={isExpanded ? 'Collapse' : 'Expand'}
         >
@@ -122,48 +540,59 @@ const TreeRow: React.FC<TreeRowProps> = ({
             transition={{ duration: 0.15 }}
             className="block"
           >
-            <ChevronRight size={13} strokeWidth={2} />
+            <ChevronRight size={14} strokeWidth={2} style={{ color: isSelected || isOnActivePath ? YELLOW_ACCENT : undefined }} />
           </motion.span>
         </button>
       ) : (
         <span className="w-5 shrink-0" />
       )}
 
-      {/* Type icon */}
+      {/* Brand or Type Icon */}
       <span
-        className="shrink-0"
-        style={{ color: isSelected ? domainColor : depth === 1 ? domainColor : '#6b7280' }}
+        className="shrink-0 transition-colors"
+        style={{
+          color: isSelected || isOnActivePath ? YELLOW_ACCENT : '#999999',
+          filter: isSelected ? 'drop-shadow(0 0 4px rgba(242,194,48,0.4))' : isOnActivePath ? 'drop-shadow(0 0 3px rgba(242,194,48,0.25))' : undefined,
+        }}
       >
-        {getNodeIcon(node.type)}
+        <BrandLogo name={node.name} type={node.type} size={15} />
       </span>
 
-      {/* Label */}
-      <span className={`truncate text-sm leading-none ${
-        depth === 1
-          ? 'font-semibold text-white'
+      {/* Node Name Label */}
+      <span
+        className={`truncate text-sm leading-none ml-1.5 ${depth === 1
+          ? 'font-bold text-white'
           : isSelected
-          ? 'text-white font-medium'
-          : isSearchMatch
-          ? 'text-neutral-100'
-          : 'text-neutral-400'
-      }`}>
+            ? 'font-bold text-white'
+            : isOnActivePath
+              ? 'font-medium text-neutral-100'
+              : isSearchMatch
+                ? 'text-neutral-200'
+                : 'text-neutral-400'
+          }`}
+      >
         {node.name}
       </span>
 
-      {/* Right: experience badge + child count */}
+      {/* Right side: Experience Badge + Children count */}
       <div className="ml-auto flex items-center gap-2 shrink-0">
-        {node.experienceLevel && isSelected && (
-          <span className="chip chip-accent text-[10px] hidden sm:inline-flex">{node.experienceLevel}</span>
+        {node.experienceLevel && (isSelected || isOnActivePath) && (
+          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-[#2a2410] text-[#F2C230] border border-[#524115]">
+            {node.experienceLevel}
+          </span>
         )}
         {hasChildren && (
-          <span className="text-[10px] font-mono text-neutral-700 tabular-nums">{node.children!.length}</span>
+          <span className={`text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded ${isSelected ? 'bg-[#222] text-[#F2C230]' : 'text-neutral-500'
+            }`}>
+            {node.children!.length}
+          </span>
         )}
       </div>
     </div>
   );
 };
 
-// ── Sub-component: recursively render children
+// ── Recursive Branch Renderer with Inline Detail Panel ──
 interface TreeBranchProps {
   node: TreeNode;
   depth: number;
@@ -171,22 +600,29 @@ interface TreeBranchProps {
   selectedId: string | null;
   matchingIds: Set<string>;
   exactMatchIds: Set<string>;
-  domainMap: Map<string, string>; // nodeId → domainColor
+  activePath: Set<string>;
+  treeData: TreeNode;
+  projects: Project[];
+  projectLinks: ProjectLink[];
   onToggle: (id: string) => void;
   onSelect: (id: string) => void;
+  onExpandParent: (parentId: string) => void;
   selectedRef: React.RefObject<HTMLDivElement | null>;
   isSearching: boolean;
+  ancestorIds: string[];
+  isLastSibling: boolean;
 }
 
 const TreeBranch: React.FC<TreeBranchProps> = ({
   node, depth, expandedIds, selectedId, matchingIds, exactMatchIds,
-  domainMap, onToggle, onSelect, selectedRef, isSearching
+  activePath, treeData, projects, projectLinks, onToggle, onSelect,
+  onExpandParent, selectedRef, isSearching, ancestorIds, isLastSibling
 }) => {
   const isExpanded = expandedIds.has(node.id);
   const isSelected = selectedId === node.id;
   const isVisible = !isSearching || matchingIds.has(node.id);
   const isSearchMatch = exactMatchIds.has(node.id);
-  const domainColor = domainMap.get(node.id) || '#6366f1';
+  const isOnActivePath = activePath.has(node.id);
   const hasChildren = (node.children?.length ?? 0) > 0;
 
   return (
@@ -198,12 +634,33 @@ const TreeBranch: React.FC<TreeBranchProps> = ({
         isSelected={isSelected}
         isVisible={isVisible}
         isSearchMatch={isSearchMatch}
-        domainColor={domainColor}
+        isOnActivePath={isOnActivePath}
+        isLastSibling={isLastSibling}
+        ancestorIds={ancestorIds}
+        activePath={activePath}
+        treeData={treeData}
         onToggle={onToggle}
         onSelect={onSelect}
         nodeRef={isSelected ? selectedRef : undefined}
       />
 
+      {/* Accordion Single Panel: Render Inline Detail Panel directly under the clicked row */}
+      <AnimatePresence>
+        {isSelected && (
+          <InlineDetailPanel
+            key={`inline-detail-${node.id}`}
+            node={node}
+            treeData={treeData}
+            projects={projects}
+            projectLinks={projectLinks}
+            onSelectNode={onSelect}
+            onExpandParent={onExpandParent}
+            onClose={() => onSelect('')}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Children Sub-branch */}
       {hasChildren && (
         <AnimatePresence initial={false}>
           {isExpanded && (
@@ -215,7 +672,7 @@ const TreeBranch: React.FC<TreeBranchProps> = ({
               transition={{ duration: 0.18, ease: 'easeInOut' }}
               className="overflow-hidden"
             >
-              {node.children!.map(child => (
+              {node.children!.map((child, idx) => (
                 <TreeBranch
                   key={child.id}
                   node={child}
@@ -224,11 +681,17 @@ const TreeBranch: React.FC<TreeBranchProps> = ({
                   selectedId={selectedId}
                   matchingIds={matchingIds}
                   exactMatchIds={exactMatchIds}
-                  domainMap={domainMap}
+                  activePath={activePath}
+                  treeData={treeData}
+                  projects={projects}
+                  projectLinks={projectLinks}
                   onToggle={onToggle}
                   onSelect={onSelect}
+                  onExpandParent={onExpandParent}
                   selectedRef={selectedRef}
                   isSearching={isSearching}
+                  ancestorIds={[...ancestorIds, node.id]}
+                  isLastSibling={idx === node.children!.length - 1}
                 />
               ))}
             </motion.div>
@@ -239,45 +702,80 @@ const TreeBranch: React.FC<TreeBranchProps> = ({
   );
 };
 
-// ── Main component
-export const VerticalKnowledgeTree: React.FC<VerticalKnowledgeTreeProps> = ({ treeData, projects }) => {
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
-    // Start with root and all domain children expanded
-    const ids = new Set<string>([treeData.id]);
+// ── Main Knowledge Tree v2 Component ──
+export const VerticalKnowledgeTree: React.FC<VerticalKnowledgeTreeProps> = ({
+  treeData, projects, projectLinks, highlightedNodeId
+}) => {
+  // Default expanded: all top domain nodes
+  const defaultExpanded = useMemo(() => {
+    const ids = new Set<string>();
     treeData.children?.forEach(d => ids.add(d.id));
     return ids;
-  });
-  const [selectedId, setSelectedId] = useState<string | null>(treeData.id);
+  }, [treeData]);
+
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() =>
+    loadExpandState(defaultExpanded)
+  );
+
+  // Selected Node (Accordion Single-panel active node)
+  const [selectedId, setSelectedId] = useState<string | null>(
+    treeData.children?.[0]?.id ?? null
+  );
+
+  // Handle externally passed highlightedNodeId (e.g., navigation from Skill Hunt Game)
+  // Uses double-rAF to ensure DOM has settled after re-mount before scrolling
+  useEffect(() => {
+    if (!highlightedNodeId) return;
+    const breadcrumb = findBreadcrumb(treeData, highlightedNodeId);
+    if (!breadcrumb) return;
+    // Expand all ancestor nodes so the target is visible
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      breadcrumb.forEach(n => next.add(n.id));
+      saveExpandState(next);
+      return next;
+    });
+    setSelectedId(highlightedNodeId);
+    // Double-rAF: wait for React to commit + browser to paint before scrolling
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        selectedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+  }, [highlightedNodeId, treeData]);
   const [searchTerm, setSearchTerm] = useState('');
   const selectedRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Build domainColor map (nodeId → color) once
-  const domainMap = React.useMemo(() => {
-    const map = new Map<string, string>();
-    function walk(node: TreeNode, color: string) {
-      map.set(node.id, color);
-      node.children?.forEach(c => walk(c, node.type === 'domain' ? (node.color || DOMAIN_COLORS[node.id] || color) : color));
-    }
-    walk(treeData, '#6366f1');
-    return map;
-  }, [treeData]);
+  // Active path with strict ancestor route highlighting (respects expanded state)
+  const activePath = useMemo(() =>
+    deriveActivePath(treeData, selectedId, expandedIds),
+    [treeData, selectedId, expandedIds]
+  );
 
-  // Search: compute matching IDs
+  // Search filter calculation
   const q = searchTerm.toLowerCase().trim();
-  const matchingIds = React.useMemo(() => q ? collectMatchingIds(treeData, q) : new Set<string>(), [treeData, q]);
-  
-  // Exact match IDs (the node itself matches, not just an ancestor)
-  const exactMatchIds = React.useMemo(() => {
+  const matchingIds = useMemo(
+    () => q ? collectMatchingIds(treeData, q, projectLinks, projects) : new Set<string>(),
+    [treeData, q, projectLinks, projects]
+  );
+  const exactMatchIds = useMemo(() => {
     if (!q) return new Set<string>();
     const result = new Set<string>();
     function walk(node: TreeNode) {
-      if (node.name.toLowerCase().includes(q) || (node.description ?? '').toLowerCase().includes(q)) result.add(node.id);
+      const nameMatch = node.name.toLowerCase().includes(q) || (node.description ?? '').toLowerCase().includes(q);
+      const projectMatch = projectLinks
+        .filter(l => l.nodeId === node.id)
+        .some(l => {
+          const proj = projects.find(p => p.id === l.projectId);
+          return proj?.title.toLowerCase().includes(q);
+        });
+      if (nameMatch || projectMatch) result.add(node.id);
       node.children?.forEach(walk);
     }
     walk(treeData);
     return result;
-  }, [treeData, q]);
+  }, [treeData, q, projectLinks, projects]);
 
   // Auto-expand matching branches on search
   useEffect(() => {
@@ -289,22 +787,61 @@ export const VerticalKnowledgeTree: React.FC<VerticalKnowledgeTreeProps> = ({ tr
     });
   }, [matchingIds, q]);
 
-  // Auto-scroll to selected node
+  // Scroll active item into view when selected via normal UI interactions
   useEffect(() => {
-    selectedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [selectedId]);
+    // Only scroll if triggered by user interaction, not by the highlightedNodeId effect
+    // which handles its own scroll via double-rAF above
+    if (highlightedNodeId && selectedId === highlightedNodeId) return;
+    requestAnimationFrame(() => {
+      selectedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleToggle = useCallback((id: string) => {
     setExpandedIds(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      const isCollapsing = next.has(id);
+      if (isCollapsing) {
+        next.delete(id);
+        // If selectedId is id or a descendant inside id, deselect selectedId to close card & clear path
+        setSelectedId(curr => {
+          if (!curr) return null;
+          if (curr === id) return null;
+          const chain = findBreadcrumb(treeData, curr);
+          if (chain && chain.some(n => n.id === id)) {
+            return null;
+          }
+          return curr;
+        });
+      } else {
+        next.add(id);
+      }
+      saveExpandState(next);
       return next;
     });
-  }, []);
+  }, [treeData]);
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id);
+    setExpandedIds(prev => {
+      const node = findNode(treeData, id);
+      if (node && (node.children?.length ?? 0) > 0 && !prev.has(id)) {
+        const next = new Set(prev);
+        next.add(id);
+        saveExpandState(next);
+        return next;
+      }
+      return prev;
+    });
+  }, [treeData]);
+
+  const handleExpandParent = useCallback((parentId: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      next.add(parentId);
+      saveExpandState(next);
+      return next;
+    });
   }, []);
 
   const expandAll = () => {
@@ -312,15 +849,38 @@ export const VerticalKnowledgeTree: React.FC<VerticalKnowledgeTreeProps> = ({ tr
     function walk(n: TreeNode) { ids.add(n.id); n.children?.forEach(walk); }
     walk(treeData);
     setExpandedIds(ids);
+    saveExpandState(ids);
   };
 
   const collapseAll = () => {
-    setExpandedIds(new Set([treeData.id]));
+    const ids = new Set<string>();
+    treeData.children?.forEach(d => ids.add(d.id));
+    setExpandedIds(ids);
+    setSelectedId(null);
+    saveExpandState(ids);
   };
 
-  // Keyboard navigation
+  // Keyboard navigation visible rows array
+  const visibleRows = useMemo(() => {
+    const rows: string[] = [];
+    treeData.children?.forEach(domain =>
+      collectVisibleIds(domain, expandedIds, !!q, matchingIds, rows)
+    );
+    return rows;
+  }, [treeData, expandedIds, q, matchingIds]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!selectedId) return;
+
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const idx = visibleRows.indexOf(selectedId);
+      if (idx === -1) return;
+      const nextIdx = e.key === 'ArrowDown' ? Math.min(idx + 1, visibleRows.length - 1) : Math.max(idx - 1, 0);
+      setSelectedId(visibleRows[nextIdx]);
+      return;
+    }
+
     const node = findNode(treeData, selectedId);
     if (!node) return;
 
@@ -332,239 +892,90 @@ export const VerticalKnowledgeTree: React.FC<VerticalKnowledgeTreeProps> = ({ tr
       }
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      if (expandedIds.has(selectedId)) handleToggle(selectedId);
-    } else if (e.key === 'Enter') {
+      if (expandedIds.has(selectedId)) {
+        handleToggle(selectedId);
+      } else {
+        const chain = findBreadcrumb(treeData, selectedId);
+        if (chain && chain.length > 2) setSelectedId(chain[chain.length - 2].id);
+      }
+    } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       if ((node.children?.length ?? 0) > 0) handleToggle(selectedId);
     }
   };
 
-  // Derived: selected node data
-  const selectedNode = selectedId ? findNode(treeData, selectedId) : null;
-  const breadcrumb = selectedId ? (findBreadcrumb(treeData, selectedId) ?? []) : [];
-  const domainColor = domainMap.get(selectedId ?? '') || '#6366f1';
-
-  const relatedProjects = selectedNode
-    ? projects.filter(p =>
-        p.visibility && (
-          p.techStack.some(t => t.toLowerCase() === selectedNode.name.toLowerCase()) ||
-          p.tags.some(t => t.toLowerCase() === selectedNode.name.toLowerCase())
-        ))
-    : [];
-
   return (
-    <div className="flex flex-col lg:flex-row gap-4" onKeyDown={handleKeyDown}>
-      {/* ── LEFT: Tree Explorer */}
-      <div className="lg:w-[55%] flex flex-col gap-3">
-        {/* Search + Expand/Collapse toolbar */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-600" />
-            <input
-              ref={searchRef}
-              type="text"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Search skills, libraries, concepts…"
-              className="w-full bg-[#111] border border-[#222] rounded-lg pl-9 pr-8 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-300"
-              >
-                <X size={13} />
-              </button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <button onClick={expandAll} className="btn-ghost text-xs py-1.5 px-3 whitespace-nowrap">Expand all</button>
-            <button onClick={collapseAll} className="btn-ghost text-xs py-1.5 px-3 whitespace-nowrap">Collapse</button>
-          </div>
-        </div>
-
-        {/* Tree container */}
-        <div
-          role="tree"
-          aria-label="Knowledge Tree"
-          className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-xl p-2 max-h-[640px] overflow-y-auto"
-          style={{ minHeight: 360 }}
-        >
-          {/* Root node children directly */}
-          {treeData.children?.map(domain => (
-            <TreeBranch
-              key={domain.id}
-              node={domain}
-              depth={1}
-              expandedIds={expandedIds}
-              selectedId={selectedId}
-              matchingIds={matchingIds}
-              exactMatchIds={exactMatchIds}
-              domainMap={domainMap}
-              onToggle={handleToggle}
-              onSelect={handleSelect}
-              selectedRef={selectedRef}
-              isSearching={!!q}
-            />
-          ))}
-        </div>
-
-        <p className="text-xs text-neutral-700 font-mono px-1">
-          ↑↓ navigate · → expand · ← collapse · click to inspect
-        </p>
-      </div>
-
-      {/* ── RIGHT: Inspector Panel */}
-      <div className="lg:w-[45%]">
-        <AnimatePresence mode="wait">
-          {selectedNode ? (
-            <motion.div
-              key={selectedNode.id}
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.2 }}
-              className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-xl p-5 h-full max-h-[700px] overflow-y-auto space-y-5"
+    <div className="w-full flex flex-col gap-4" onKeyDown={handleKeyDown}>
+      {/* Search Toolbar */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+          <input
+            ref={searchRef}
+            type="text"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Search skills, libraries, tools, projects…"
+            className="w-full bg-[#111111] border border-[#222222] rounded-xl pl-10 pr-8 py-2.5 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-[#F2C230]/60 transition-colors shadow-inner"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-200"
             >
-              {/* Breadcrumb */}
-              {breadcrumb.length > 1 && (
-                <div className="flex items-center gap-1 flex-wrap text-xs text-neutral-600">
-                  {breadcrumb.slice(1).map((b, i, arr) => (
-                    <React.Fragment key={b.id}>
-                      <button
-                        onClick={() => setSelectedId(b.id)}
-                        className={`hover:text-neutral-300 transition-colors truncate max-w-[100px] ${i === arr.length - 1 ? 'text-white' : ''}`}
-                      >
-                        {b.name}
-                      </button>
-                      {i < arr.length - 1 && <ChevronRight size={10} className="text-neutral-700 shrink-0" />}
-                    </React.Fragment>
-                  ))}
-                </div>
-              )}
-
-              {/* Header */}
-              <div className="pb-4 border-b border-[#1a1a1a]">
-                <div className="flex items-start gap-3">
-                  <span style={{ color: domainColor }} className="mt-0.5 shrink-0">
-                    {getNodeIcon(selectedNode.type, 20)}
-                  </span>
-                  <div>
-                    <h3 className="text-xl font-bold text-white tracking-tight">{selectedNode.name}</h3>
-                    <p className="text-xs text-neutral-500 mt-0.5 font-mono capitalize">{selectedNode.type.replace('_', ' ')}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Meta grid */}
-              <div className="grid grid-cols-2 gap-3">
-                {selectedNode.experienceLevel && (
-                  <div className="bg-[#111] border border-[#1a1a1a] rounded-lg p-3">
-                    <p className="text-[10px] font-mono text-neutral-600 uppercase mb-1">Experience</p>
-                    <p className="text-sm font-semibold text-emerald-400">{selectedNode.experienceLevel}</p>
-                  </div>
-                )}
-                {selectedNode.yearsOfExperience !== undefined && (
-                  <div className="bg-[#111] border border-[#1a1a1a] rounded-lg p-3">
-                    <p className="text-[10px] font-mono text-neutral-600 uppercase mb-1">Years</p>
-                    <p className="text-sm font-semibold text-white">{selectedNode.yearsOfExperience}+ yrs</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Description */}
-              {selectedNode.description && (
-                <div>
-                  <p className="text-[10px] font-mono text-neutral-600 uppercase mb-2">Overview</p>
-                  <p className="text-sm text-neutral-300 leading-relaxed">{selectedNode.description}</p>
-                </div>
-              )}
-
-              {/* Child concepts */}
-              {selectedNode.children && selectedNode.children.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-mono text-neutral-600 uppercase mb-2">
-                    Includes ({selectedNode.children.length})
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedNode.children.map(child => (
-                      <button
-                        key={child.id}
-                        onClick={() => {
-                          setSelectedId(child.id);
-                          setExpandedIds(prev => new Set([...prev, selectedNode.id]));
-                        }}
-                        className="chip text-[11px] hover:border-indigo-500/30 hover:text-white transition-all cursor-pointer"
-                      >
-                        {child.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Related skills */}
-              {selectedNode.relatedSkills && selectedNode.relatedSkills.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-mono text-neutral-600 uppercase mb-2">Related Skills</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedNode.relatedSkills.map(s => (
-                      <span key={s} className="chip chip-accent text-[11px]">{s}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Tags */}
-              {selectedNode.tags && selectedNode.tags.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-mono text-neutral-600 uppercase mb-2">Tags</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedNode.tags.map(t => (
-                      <span key={t} className="chip text-[11px]">#{t}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Notes */}
-              {selectedNode.notes && (
-                <div className="bg-[#111] border border-[#1a1a1a] rounded-lg p-3">
-                  <p className="text-[10px] font-mono text-neutral-600 uppercase mb-1.5">Notes</p>
-                  <p className="text-xs text-neutral-400 leading-relaxed">{selectedNode.notes}</p>
-                </div>
-              )}
-
-              {/* Related Projects */}
-              {relatedProjects.length > 0 && (
-                <div className="pt-3 border-t border-[#1a1a1a]">
-                  <p className="text-[10px] font-mono text-neutral-600 uppercase mb-2 flex items-center gap-1.5">
-                    <FolderGit2 size={10} /> Applied in Projects
-                  </p>
-                  <div className="space-y-2">
-                    {relatedProjects.map(p => (
-                      <div key={p.id} className="bg-[#111] border border-[#1a1a1a] rounded-lg px-3 py-2">
-                        <p className="text-xs font-semibold text-white">{p.title}</p>
-                        <p className="text-[11px] text-neutral-500">{p.category}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-xl p-8 h-full flex items-center justify-center"
-            >
-              <p className="text-sm text-neutral-700 text-center">
-                Select a node from the tree<br />to view details
-              </p>
-            </motion.div>
+              <X size={14} />
+            </button>
           )}
-        </AnimatePresence>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={expandAll}
+            className="px-3.5 py-2 rounded-xl bg-[#141414] border border-[#262626] text-xs font-mono text-neutral-300 hover:text-[#F2C230] hover:border-[#F2C230]/40 transition-all whitespace-nowrap"
+          >
+            Expand all
+          </button>
+          <button
+            onClick={collapseAll}
+            className="px-3.5 py-2 rounded-xl bg-[#141414] border border-[#262626] text-xs font-mono text-neutral-400 hover:text-white hover:border-neutral-700 transition-all whitespace-nowrap"
+          >
+            Collapse
+          </button>
+        </div>
       </div>
+
+      {/* Main Single-Column Tree Container with Inline Panels & Smart Scrollbar */}
+      <div
+        role="tree"
+        aria-label="Knowledge Tree"
+        className="bg-[#0d0d0d] border border-[#1f1f1f] rounded-2xl p-4 min-h-[420px] max-h-[600px] overflow-y-auto custom-tree-scrollbar shadow-2xl space-y-1 scroll-smooth"
+      >
+        {treeData.children?.map((domain, idx) => (
+          <TreeBranch
+            key={domain.id}
+            node={domain}
+            depth={1}
+            expandedIds={expandedIds}
+            selectedId={selectedId}
+            matchingIds={matchingIds}
+            exactMatchIds={exactMatchIds}
+            activePath={activePath}
+            treeData={treeData}
+            projects={projects}
+            projectLinks={projectLinks}
+            onToggle={handleToggle}
+            onSelect={handleSelect}
+            onExpandParent={handleExpandParent}
+            selectedRef={selectedRef}
+            isSearching={!!q}
+            ancestorIds={[treeData.id]}
+            isLastSibling={idx === (treeData.children!.length - 1)}
+          />
+        ))}
+      </div>
+
+      <p className="text-xs text-neutral-500 font-mono px-1">
+        ↑↓ navigate · → expand · ← collapse · Enter toggle · click node to inspect details inline
+      </p>
     </div>
   );
 };

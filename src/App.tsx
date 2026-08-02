@@ -33,6 +33,8 @@ function mergeWithDefaults(saved: PortfolioCMSData): PortfolioCMSData {
     profile: { ...INITIAL_CMS_DATA.profile, ...saved.profile },
     sectionVisibility: { ...INITIAL_CMS_DATA.sectionVisibility, ...saved.sectionVisibility },
     achievements: saved.achievements ?? INITIAL_CMS_DATA.achievements,
+    // Migrate: projectLinks didn't exist in older schema versions
+    projectLinks: saved.projectLinks ?? INITIAL_CMS_DATA.projectLinks ?? [],
   };
   if (!merged.profile.resumeUrl || merged.profile.resumeUrl === '#') {
     merged.profile.resumeUrl = '/Amrit_Bakshi_Resume.pdf';
@@ -189,6 +191,8 @@ export function App() {
                   <SkillsSection
                     skillTree={cmsData.skillTree}
                     projects={cmsData.projects}
+                    projectLinks={cmsData.projectLinks}
+                    showSkillHunt={sv.skillHunt ?? true}
                   />
                 )}
 

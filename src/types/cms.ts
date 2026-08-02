@@ -139,6 +139,7 @@ export interface SectionVisibility {
   hero: boolean;
   about: boolean;
   skills: boolean;
+  skillHunt?: boolean;
   projects: boolean;
   experience: boolean;
   certifications: boolean;
@@ -166,6 +167,14 @@ export interface Profile {
   isAvailable?: boolean;
 }
 
+// Many-to-many join: a knowledge-tree node ↔ a project
+export interface ProjectLink {
+  id: string;          // unique link ID
+  projectId: string;   // references Project.id
+  nodeId: string;      // references TreeNode.id
+  usage: string;       // free-text: how this specific node was used in this project
+}
+
 export interface PortfolioCMSData {
   profile: Profile;
   skillTree: TreeNode;
@@ -173,8 +182,9 @@ export interface PortfolioCMSData {
   experiences: WorkExperience[];
   certifications: Certification[];
   education: Education[];
-  achievements: Achievement[];           // NEW
-  sectionVisibility: SectionVisibility;  // NEW
+  achievements: Achievement[];
+  sectionVisibility: SectionVisibility;
   mediaLibrary: MediaItem[];
+  projectLinks: ProjectLink[];           // NEW: explicit node↔project many-to-many
   adminPasscode: string;
 }

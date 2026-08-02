@@ -497,6 +497,7 @@ export const INITIAL_CMS_DATA: PortfolioCMSData = {
     hero: true,
     about: true,
     skills: true,
+    skillHunt: true,
     projects: true,
     experience: true,
     certifications: true,
@@ -513,6 +514,38 @@ export const INITIAL_CMS_DATA: PortfolioCMSData = {
       uploadDate: "2026-08-01",
       altText: "Amrit Bakshi Headshot Photo",
       caption: "Profile Avatar"
+    }
+  ],
+  projectLinks: [
+    {
+      id: "pl_pandas_synthslm",
+      projectId: "synthslm",
+      nodeId: "pandas",
+      usage: "Core data manipulation library — used to load user-uploaded CSVs, profile column distributions, apply transformation pipelines, and export validated synthetic datasets in CSV/Excel/JSON formats."
+    },
+    {
+      id: "pl_numpy_synthslm",
+      projectId: "synthslm",
+      nodeId: "numpy",
+      usage: "Statistical sampling engine — used to generate numeric column values preserving original mean/std distributions, compute correlation matrices, and run outlier-detection thresholds."
+    },
+    {
+      id: "pl_streamlit_synthslm",
+      projectId: "synthslm",
+      nodeId: "streamlit-py",
+      usage: "Full interactive web UI — schema configuration wizard, generation parameter controls, side-by-side original vs. synthetic data comparison dashboard, and one-click export panel."
+    },
+    {
+      id: "pl_sqlite_synthslm",
+      projectId: "synthslm",
+      nodeId: "sqlite-dev",
+      usage: "Lightweight embedded database used to persist user sessions, schema definitions, and generation run history across app restarts without requiring a separate server."
+    },
+    {
+      id: "pl_faker_synthslm",
+      projectId: "synthslm",
+      nodeId: "faker",
+      usage: "Realistic fake-data provider for text and categorical columns — names, addresses, emails, and domain-specific strings generated to match schema type annotations."
     }
   ],
   adminPasscode: "admin123"

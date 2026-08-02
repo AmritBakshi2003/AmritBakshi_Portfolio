@@ -327,6 +327,12 @@ export const AdminCMS: React.FC<AdminCMSProps> = ({
             setFormData({ ...formData, skillTree: newTree });
             showNotification('Knowledge Tree updated!');
           }}
+          projectLinks={formData.projectLinks ?? []}
+          projects={formData.projects}
+          onUpdateProjectLinks={(links) => {
+            setFormData({ ...formData, projectLinks: links });
+            showNotification('Project links updated!');
+          }}
         />
       )}
 
@@ -468,8 +474,18 @@ export const AdminCMS: React.FC<AdminCMSProps> = ({
             <div key={proj.id} className="cyber-card p-6 rounded-2xl space-y-4 relative border border-slate-800">
               <button
                 onClick={() => {
-                  setFormData({ ...formData, projects: formData.projects.filter(p => p.id !== proj.id) });
-                  showNotification('Project deleted');
+                  const linkedCount = (formData.projectLinks ?? []).filter(l => l.projectId === proj.id).length;
+                  const msg = linkedCount > 0
+                    ? `"${proj.title}" is referenced in ${linkedCount} knowledge-tree skill link${linkedCount > 1 ? 's' : ''}. Deleting it will also remove those links. Continue?`
+                    : `Delete project "${proj.title}"?`;
+                  if (confirm(msg)) {
+                    setFormData({
+                      ...formData,
+                      projects: formData.projects.filter(p => p.id !== proj.id),
+                      projectLinks: (formData.projectLinks ?? []).filter(l => l.projectId !== proj.id),
+                    });
+                    showNotification('Project deleted — associated skill links also removed.');
+                  }
                 }}
                 className="absolute top-4 right-4 text-slate-500 hover:text-red-400"
               >
@@ -1215,6 +1231,7 @@ export const AdminCMS: React.FC<AdminCMSProps> = ({
           { key: 'hero',           label: 'Hero Section',         desc: 'Profile photo, name, tagline, and CTA buttons' },
           { key: 'about',          label: 'About Section',        desc: 'Bio text and specialization tags' },
           { key: 'skills',         label: 'Skills Knowledge Tree', desc: 'Hierarchical skill tree with inspector panel' },
+          { key: 'skillHunt',      label: 'Interactive Skill Hunt (Pac-Man Showcase)', desc: 'Interactive Pac-Man showcase button & game feature' },
           { key: 'projects',       label: 'Projects Section',      desc: 'Featured and regular project cards' },
           { key: 'experience',     label: 'Work Experience',       desc: 'Timeline of roles and bullet points' },
           { key: 'certifications', label: 'Certifications',        desc: 'Credential cards with verification links' },
