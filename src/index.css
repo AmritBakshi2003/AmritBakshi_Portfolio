@@ -313,7 +313,7 @@
   }
 }
 
-/* Smart Tree Scrollbar */
+/* Smart Tree Scrollbar — vertical */
 .custom-tree-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: #282828 #0d0d0d;
@@ -334,5 +334,28 @@
 .custom-tree-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #F2C230;
 }
+
+/* Smart Tree Scrollbar — horizontal wrapper */
+.custom-tree-x-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #282828 #111111;
+}
+.custom-tree-x-scrollbar::-webkit-scrollbar {
+  height: 5px;
+}
+.custom-tree-x-scrollbar::-webkit-scrollbar-track {
+  background: #111111;
+  border-radius: 8px;
+  margin: 0 12px;
+}
+.custom-tree-x-scrollbar::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+.custom-tree-x-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #F2C230;
+}
+
 
 

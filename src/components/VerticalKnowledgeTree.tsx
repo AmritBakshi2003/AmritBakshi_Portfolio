@@ -943,35 +943,39 @@ export const VerticalKnowledgeTree: React.FC<VerticalKnowledgeTreeProps> = ({
         </div>
       </div>
 
-      {/* Main Single-Column Tree Container with Inline Panels & Smart Scrollbar */}
-      <div
-        role="tree"
-        aria-label="Knowledge Tree"
-        className="bg-[#0d0d0d] border border-[#1f1f1f] rounded-2xl p-4 min-h-[420px] max-h-[600px] overflow-y-auto custom-tree-scrollbar shadow-2xl space-y-1 scroll-smooth"
-      >
-        {treeData.children?.map((domain, idx) => (
-          <TreeBranch
-            key={domain.id}
-            node={domain}
-            depth={1}
-            expandedIds={expandedIds}
-            selectedId={selectedId}
-            matchingIds={matchingIds}
-            exactMatchIds={exactMatchIds}
-            activePath={activePath}
-            treeData={treeData}
-            projects={projects}
-            projectLinks={projectLinks}
-            onToggle={handleToggle}
-            onSelect={handleSelect}
-            onExpandParent={handleExpandParent}
-            selectedRef={selectedRef}
-            isSearching={!!q}
-            ancestorIds={[treeData.id]}
-            isLastSibling={idx === (treeData.children!.length - 1)}
-          />
-        ))}
+      {/* Horizontal scroll wrapper — activates on small / mobile screens */}
+      <div className="overflow-x-auto custom-tree-x-scrollbar rounded-2xl">
+        {/* Main Single-Column Tree Container with Inline Panels & Smart Scrollbar */}
+        <div
+          role="tree"
+          aria-label="Knowledge Tree"
+          className="bg-[#0d0d0d] border border-[#1f1f1f] rounded-2xl p-4 min-h-[420px] max-h-[600px] overflow-y-auto custom-tree-scrollbar shadow-2xl space-y-1 scroll-smooth min-w-[560px]"
+        >
+          {treeData.children?.map((domain, idx) => (
+            <TreeBranch
+              key={domain.id}
+              node={domain}
+              depth={1}
+              expandedIds={expandedIds}
+              selectedId={selectedId}
+              matchingIds={matchingIds}
+              exactMatchIds={exactMatchIds}
+              activePath={activePath}
+              treeData={treeData}
+              projects={projects}
+              projectLinks={projectLinks}
+              onToggle={handleToggle}
+              onSelect={handleSelect}
+              onExpandParent={handleExpandParent}
+              selectedRef={selectedRef}
+              isSearching={!!q}
+              ancestorIds={[treeData.id]}
+              isLastSibling={idx === (treeData.children!.length - 1)}
+            />
+          ))}
+        </div>
       </div>
+
 
       <p className="text-xs text-neutral-500 font-mono px-1">
         ↑↓ navigate · → expand · ← collapse · Enter toggle · click node to inspect details inline
